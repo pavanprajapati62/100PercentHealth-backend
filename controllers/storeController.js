@@ -1,0 +1,607 @@
+const { Op } = require("sequelize");
+const Doctor = require("../models/Doctor/Doctor");
+const Order = require("../models/Order/Order");
+const Address = require("../models/Store/Address");
+const Compliances = require("../models/Store/Compliances");
+const Contact = require("../models/Store/Contact");
+const Location = require("../models/Store/Location");
+const Store = require("../models/Store/Store");
+const StoreBillingDetail = require("../models/Store/StoreBillingDetail");
+const StoreProduct = require("../models/Product/StoreProduct");
+const Product = require("../models/Product/Product");
+const Admin = require("../models/Admin");
+const PersonalInfo = require("../models/Doctor/PersonalInfo");
+const AccountCategory = require("../models/Doctor/AccountCategory");
+const DoctorCompliances = require("../models/Doctor/Compliances");
+const ClinicAddress = require("../models/Doctor/ClinicAddress");
+const EmailInfo = require("../models/Doctor/EmailInfo");
+const PaymentDetails = require("../models/Doctor/PaymentDetails");
+
+exports.createStore = async (req, res) => {
+  try {
+    const { storeDetails, compliances, address, location, contact, billing } =
+      req.body;
+
+    // Create Store
+    const store = await Store.create(storeDetails);
+    const storeId = store.SID;
+    if (!storeId) {
+      throw new Error("Failed to generate SID for the store.");
+    }
+    // Create associated records
+    await Compliances.create({ ...compliances, SID: storeId });
+    await Address.create({ ...address, SID: storeId });
+    await Location.create({ ...location, SID: storeId });
+    await Contact.create({ ...contact, SID: storeId });
+
+    if (billing) {
+      if (billing.applyAll) {
+        const allStores = await Store.findAll();
+
+        for (const store of allStores) {
+          const existingStoreBillingDetail = await StoreBillingDetail.findOne({
+            where: { SID: store.SID },
+          });
+
+          if (!existingStoreBillingDetail) {
+            await StoreBillingDetail.create({
+              SID: store.SID,
+              smallCartFee: smallCartFee ? smallCartFee.charges : null,
+              handlingFee: handlingFee ? handlingFee.charges : null,
+              deliveryChargesSameState: deliveryChargesSameState
+                ? deliveryChargesSameState.charges
+                : null,
+              deliveryChargesOtherState: deliveryChargesOtherState
+                ? deliveryChargesOtherState.charges
+                : null,
+            });
+          } else {
+            await StoreBillingDetail.update(
+              {
+                smallCartFee: smallCartFee
+                  ? smallCartFee.charges
+                  : existingStoreBillingDetail.smallCartFee,
+                handlingFee: handlingFee
+                  ? handlingFee.charges
+                  : existingStoreBillingDetail.handlingFee,
+                deliveryChargesSameState: deliveryChargesSameState
+                  ? deliveryChargesSameState.charges
+                  : existingStoreBillingDetail.deliveryChargesSameState,
+                deliveryChargesOtherState: deliveryChargesOtherState
+                  ? deliveryChargesOtherState.charges
+                  : existingStoreBillingDetail.deliveryChargesOtherState,
+              },
+              { where: { SID: store.SID } }
+            );
+          }
+        }
+
+        return res.status(201).json({ message: "Applied to all stores" });
+      } else {
+        if (smallCartFee && smallCartFee.storeTitle) {
+          const store = await Store.findOne({
+            where: { title: smallCartFee.storeTitle },
+          });
+          const existingStoreBillingDetail = await StoreBillingDetail.findOne({
+            where: { SID: store.SID },
+          });
+          if (!existingStoreBillingDetail) {
+            await StoreBillingDetail.create({
+              SID: store.SID,
+              smallCartFee: smallCartFee.charges,
+            });
+          } else {
+            await StoreBillingDetail.update(
+              {
+                smallCartFee: smallCartFee.charges,
+              },
+              { where: { SID: store.SID } }
+            );
+          }
+        }
+
+        if (handlingFee && handlingFee.storeTitle) {
+          const store = await Store.findOne({
+            where: { title: handlingFee.storeTitle },
+          });
+          const existingStoreBillingDetail = await StoreBillingDetail.findOne({
+            where: { SID: store.SID },
+          });
+          if (!existingStoreBillingDetail) {
+            await StoreBillingDetail.create({
+              SID: store.SID,
+              handlingFee: handlingFee.charges,
+            });
+          } else {
+            await StoreBillingDetail.update(
+              {
+                handlingFee: handlingFee.charges,
+              },
+              { where: { SID: store.SID } }
+            );
+          }
+        }
+
+        if (deliveryChargesSameState && deliveryChargesSameState.storeTitle) {
+          const store = await Store.findOne({
+            where: { title: handlingFee.storeTitle },
+          });
+          const existingStoreBillingDetail = await StoreBillingDetail.findOne({
+            where: { SID: store.SID },
+          });
+          if (!existingStoreBillingDetail) {
+            await StoreBillingDetail.create({
+              SID: store.SID,
+              deliveryChargesSameState: deliveryChargesSameState.charges,
+            });
+          } else {
+            await StoreBillingDetail.update(
+              {
+                deliveryChargesSameState: deliveryChargesSameState.charges,
+              },
+              { where: { SID: store.SID } }
+            );
+          }
+        }
+
+        if (deliveryChargesOtherState && deliveryChargesOtherState.storeTitle) {
+          const store = await Store.findOne({
+            where: { title: handlingFee.storeTitle },
+          });
+          const existingStoreBillingDetail = await StoreBillingDetail.findOne({
+            where: { SID: store.SID },
+          });
+          if (!existingStoreBillingDetail) {
+            await StoreBillingDetail.create({
+              SID: store.SID,
+              deliveryChargesOtherState: deliveryChargesOtherState.charges,
+            });
+          } else {
+            await StoreBillingDetail.update(
+              {
+                deliveryChargesOtherState: deliveryChargesOtherState.charges,
+              },
+              { where: { SID: store.SID } }
+            );
+          }
+        }
+
+        res.status(201).json({ message: "Applied" });
+      }
+    }
+
+    res
+      .status(201)
+      .json({ message: "Store and related details created successfully." });
+  } catch (err) {
+    console.error("Error creating store:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to create store and related details." });
+  }
+};
+
+exports.getAllStores = async (req, res) => {
+  try {
+    const stores = await Store.findAll({
+      include: [Compliances, Address, Location, Contact, Order],
+    });
+    res.status(200).json(stores);
+  } catch (error) {
+    console.error("Error getting all stores:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getStoreById = async (req, res) => {
+  const SID = req?.params?.id;
+
+  try {
+    const store = await Store.findOne({
+      where: { SID },
+      include: [Compliances, Address, Location, Contact, Order],
+    });
+
+    if (!store) {
+      return res.status(404).json({ message: "Store not found" });
+    }
+
+    res.status(200).json(store);
+  } catch (error) {
+    console.error("Error getting store by ID:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateStore = async (req, res) => {
+  try {
+    const SID = req?.params?.id;
+    const { storeDetails, compliances, address, location, contact } = req.body;
+
+    const store = await Store.findOne({
+      where: { SID },
+    });
+    if (!store) return res.status(404).json({ error: "Store not found" });
+
+    await store.update(storeDetails);
+    await Compliances.update(compliances, { where: { SID } });
+    await Address.update(address, { where: { SID } });
+    await Location.update(location, { where: { SID } });
+    await Contact.update(contact, { where: { SID } });
+
+    res.status(200).json({ message: "Store updated successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Assign multiple doctors to a store by admin
+exports.assignDoctorToStore = async (req, res) => {
+  const { SID, doctorId } = req.body;
+
+  try {
+    const store = await Store.findOne({ where: { SID } });
+    if (!store) {
+      return res.status(404).json({ message: "Store not found" });
+    }
+
+    const doctor = await Doctor.findOne({ where: { DID: doctorId } });
+    if (!doctor) {
+      return res.status(404).json({ message: "Doctor not found" });
+    }
+
+    if (doctor.SID) {
+      return res
+        .status(400)
+        .json({ message: "Doctor is already assigned to a store" });
+    }
+
+    doctor.SID = SID;
+    await doctor.save();
+
+    res.status(200).json({ message: "Store assigned successfully" });
+  } catch (error) {
+    console.error("Error assigning doctor to store:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get all doctors for a specific store
+// exports.getDoctorsByStore = async (req, res) => {
+//   const { storeId } = req.params;
+
+//   try {
+//     // Find all doctors linked to this store
+//     const doctors = await Doctor.findAll({ where: { storeId } });
+
+//     if (!doctors.length) {
+//       return res
+//         .status(404)
+//         .json({ message: "No doctors found for this store" });
+//     }
+
+//     res.status(200).json(doctors);
+//   } catch (error) {
+//     console.error("Error fetching doctors by store:", error);
+//     res.status(500).json({ message: error.message });
+//   }
+// };
+
+exports.deleteStore = async (req, res) => {
+  const SID = req.params.id;
+  try {
+    const store = await Store.destroy({
+      where: { SID: SID },
+    });
+
+    if (!store) {
+      return res.status(404).json({ error: "Store not found" });
+    }
+
+    await Store.destroy({ where: { SID } });
+    await Compliances.destroy({ where: { SID } });
+    await Address.destroy({ where: { SID } });
+    await Location.destroy({ where: { SID } });
+    await Contact.destroy({ where: { SID } });
+
+    res.status(200).json({ message: "Store deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.searchStore = async (req, res) => {
+  const searchQuery = req.query.search || "";
+  try {
+    const stores = await Store.findAll({
+      where: {
+        [Op.or]: [
+          { title: { [Op.iLike]: `%${searchQuery}%` } },
+          { username: { [Op.iLike]: `%${searchQuery}%` } },
+        ],
+      },
+    });
+
+    res.status(200).json(stores || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getStoreDetail = async (req, res) => {
+  const SID = req.userId;
+  try {
+    const store = await Store.findByPk(SID, {
+      include: [Compliances, Address, Location, Contact],
+    });
+    if (!store) {
+      return res.status(404).json({ message: "Store not found" });
+    }
+    res.status(200).json(store);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.billingStore = async (req, res) => {
+  try {
+    const {
+      smallCartFee,
+      handlingFee,
+      deliveryChargesSameState,
+      deliveryChargesOtherState,
+      applyAll,
+    } = req.body;
+
+    if (applyAll) {
+      const allStores = await Store.findAll();
+
+      for (const store of allStores) {
+        const existingStoreBillingDetail = await StoreBillingDetail.findOne({
+          where: { SID: store.SID },
+        });
+
+        if (!existingStoreBillingDetail) {
+          await StoreBillingDetail.create({
+            SID: store.SID,
+            smallCartFee: smallCartFee ? smallCartFee.charges : null,
+            handlingFee: handlingFee ? handlingFee.charges : null,
+            deliveryChargesSameState: deliveryChargesSameState
+              ? deliveryChargesSameState.charges
+              : null,
+            deliveryChargesOtherState: deliveryChargesOtherState
+              ? deliveryChargesOtherState.charges
+              : null,
+          });
+        } else {
+          await StoreBillingDetail.update(
+            {
+              smallCartFee: smallCartFee
+                ? smallCartFee.charges
+                : existingStoreBillingDetail.smallCartFee,
+              handlingFee: handlingFee
+                ? handlingFee.charges
+                : existingStoreBillingDetail.handlingFee,
+              deliveryChargesSameState: deliveryChargesSameState
+                ? deliveryChargesSameState.charges
+                : existingStoreBillingDetail.deliveryChargesSameState,
+              deliveryChargesOtherState: deliveryChargesOtherState
+                ? deliveryChargesOtherState.charges
+                : existingStoreBillingDetail.deliveryChargesOtherState,
+            },
+            { where: { SID: store.SID } }
+          );
+        }
+      }
+
+      return res.status(201).json({ message: "Applied to all stores" });
+    } else {
+      if (smallCartFee && smallCartFee.storeTitle) {
+        const store = await Store.findOne({
+          where: { title: smallCartFee.storeTitle },
+        });
+        const existingStoreBillingDetail = await StoreBillingDetail.findOne({
+          where: { SID: store.SID },
+        });
+        if (!existingStoreBillingDetail) {
+          await StoreBillingDetail.create({
+            SID: store.SID,
+            smallCartFee: smallCartFee.charges,
+          });
+        } else {
+          await StoreBillingDetail.update(
+            {
+              smallCartFee: smallCartFee.charges,
+            },
+            { where: { SID: store.SID } }
+          );
+        }
+      }
+
+      if (handlingFee && handlingFee.storeTitle) {
+        const store = await Store.findOne({
+          where: { title: handlingFee.storeTitle },
+        });
+        const existingStoreBillingDetail = await StoreBillingDetail.findOne({
+          where: { SID: store.SID },
+        });
+        if (!existingStoreBillingDetail) {
+          await StoreBillingDetail.create({
+            SID: store.SID,
+            handlingFee: handlingFee.charges,
+          });
+        } else {
+          await StoreBillingDetail.update(
+            {
+              handlingFee: handlingFee.charges,
+            },
+            { where: { SID: store.SID } }
+          );
+        }
+      }
+
+      if (deliveryChargesSameState && deliveryChargesSameState.storeTitle) {
+        const store = await Store.findOne({
+          where: { title: handlingFee.storeTitle },
+        });
+        const existingStoreBillingDetail = await StoreBillingDetail.findOne({
+          where: { SID: store.SID },
+        });
+        if (!existingStoreBillingDetail) {
+          await StoreBillingDetail.create({
+            SID: store.SID,
+            deliveryChargesSameState: deliveryChargesSameState.charges,
+          });
+        } else {
+          await StoreBillingDetail.update(
+            {
+              deliveryChargesSameState: deliveryChargesSameState.charges,
+            },
+            { where: { SID: store.SID } }
+          );
+        }
+      }
+
+      if (deliveryChargesOtherState && deliveryChargesOtherState.storeTitle) {
+        const store = await Store.findOne({
+          where: { title: handlingFee.storeTitle },
+        });
+        const existingStoreBillingDetail = await StoreBillingDetail.findOne({
+          where: { SID: store.SID },
+        });
+        if (!existingStoreBillingDetail) {
+          await StoreBillingDetail.create({
+            SID: store.SID,
+            deliveryChargesOtherState: deliveryChargesOtherState.charges,
+          });
+        } else {
+          await StoreBillingDetail.update(
+            {
+              deliveryChargesOtherState: deliveryChargesOtherState.charges,
+            },
+            { where: { SID: store.SID } }
+          );
+        }
+      }
+
+      res.status(201).json({ message: "Applied" });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getDoctorsOfStore = async (req, res) => {
+  try {
+    const SID = req.params.id;
+    const doctors = await Store.findAll({
+      where: { SID: SID },
+      attributes: [],
+      include: [
+        {
+          model: Doctor,
+          include: [
+            { model: DoctorCompliances },
+            { model: AccountCategory },
+            { model: PersonalInfo },
+            { model: ClinicAddress },
+            { model: EmailInfo },
+            { model: PaymentDetails },
+          ],
+        },
+      ],
+    });
+    res.status(200).json(doctors);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getDoctorsNotAssigned = async (req, res) => {
+  try {
+    const doctors = await Doctor.findAll({
+      where: { SID: null },
+      include: [
+        DoctorCompliances,
+        AccountCategory,
+        PersonalInfo,
+        ClinicAddress,
+        EmailInfo,
+        PaymentDetails,
+      ],
+    });
+    res.status(200).json(doctors);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getProductsOfStore = async (req, res) => {
+  try {
+    const id = req.userId;
+    let storeSID;
+    const doctor = await Doctor.findOne({ where: { DID: id } });
+    if (doctor) {
+      storeSID = doctor.SID;
+    } else {
+      storeSID = id;
+    }
+
+    const products = await StoreProduct.findAll({
+      where: { SID: storeSID },
+      attributes: [],
+      include: [Product],
+    });
+    res.status(200).json(products);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.removeDoctorFromStore = async (req, res) => {
+  try {
+    const DID = req.params.id;
+    const SID = req.params.sid;
+    const doctor = await Doctor.findOne({
+      where: { DID: DID, SID: SID },
+    });
+
+    if (!doctor) {
+      return res.status(404).json({ error: "Doctor not found" });
+    }
+
+    if (doctor.SID === null) {
+      return res
+        .status(400)
+        .json({ error: "Doctor is not associated with any store" });
+    }
+
+    doctor.SID = null;
+    await doctor.save();
+
+    res.status(200).json({ message: "Doctor removed from store" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.updateStoreStatus = async (req, res) => {
+  try {
+    const SID = req.userId;
+    const { currentStoreStatus } = req.body;
+
+    const store = await Store.findOne({ where: { SID: SID } });
+
+    if (!store) {
+      return res.status(404).json({ message: "Store not found" });
+    }
+
+    store.currentStoreStatus = currentStoreStatus;
+
+    await store.update({ currentStoreStatus });
+
+    res.status(200).json({ message: "Store status updated" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
