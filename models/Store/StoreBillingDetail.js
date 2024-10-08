@@ -13,24 +13,43 @@ const StoreBillingDetail = sequelize.define('storeBillingDetail', {
     onUpdate: 'CASCADE',
   },
   smallCartFee: {
-    type: DataTypes.FLOAT,
+    type: DataTypes.JSON, 
     allowNull: true,
+    defaultValue: {
+      charges: "",
+      applyBelow: "",
+    }
   },
   handlingFee: {
-    type: DataTypes.FLOAT,
-    allowNull: true,
+    type: DataTypes.JSON, 
+    defaultValue: {
+      charges: "",
+      applyBelow: "",
+    }
   },
   deliveryChargesSameState: {
-    type: DataTypes.FLOAT,
+    type: DataTypes.JSON,
     allowNull: true,
+    defaultValue: {
+      charges: "",
+      applyBelow: "",
+    }
   },
   deliveryChargesOtherState: {
-    type: DataTypes.FLOAT,
+    type: DataTypes.JSON, 
     allowNull: true,
+    defaultValue: {
+      charges: "",
+      applyBelow: "",
+    }
   },
   noDiscount: {
-    type: DataTypes.FLOAT,
+    type: DataTypes.JSON, 
     allowNull: true,
+    defaultValue: {
+      percentage: "",
+      applyBelow: "",
+    }
   },
   isDiscount: {
     type: DataTypes.BOOLEAN,

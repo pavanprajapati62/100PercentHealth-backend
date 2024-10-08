@@ -2,44 +2,45 @@ const { Op, Sequelize } = require("sequelize");
 const Product = require("../models/Product/Product");
 const StoreProduct = require("../models/Product/StoreProduct");
 const Store = require("../models/Store/Store");
+const ProductMargin = require("../models/Product/ProductMargin");
+const { sequelize } = require("../config/db");
 
 exports.createProduct = async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
     const {
       productId,
       productName,
       manufacturer,
+      units,
       type,
       drugs,
       storeQty,
       marginPercentage,
-      AM,
-      BM,
-      CM,
-      DM,
-      EM,
       pricing,
     } = req.body;
 
     const existingProduct = await Product.findOne({
-      where : { IID: productId }
-    })
+      where: { IID: productId },
+    });
 
-    if(existingProduct) {
+    if (existingProduct) {
       return res.status(404).json({ error: "Product id already exist" });
     }
 
-    const uniqueStoreIds = [...new Set(storeQty.map(store => store.storeId))];
+    const uniqueStoreIds = [...new Set(storeQty.map((store) => store.storeId))];
 
     const stores = await Store.findAll({
       where: {
-        SID: uniqueStoreIds, 
+        SID: uniqueStoreIds,
       },
     });
 
-    const validStoreIds = new Set(stores.map(store => store.SID));
+    const validStoreIds = new Set(stores.map((store) => store.SID));
 
-    const invalidStores = uniqueStoreIds.filter(storeId => !validStoreIds.has(storeId));
+    const invalidStores = uniqueStoreIds.filter(
+      (storeId) => !validStoreIds.has(storeId)
+    );
 
     if (invalidStores.length > 0) {
       return res.status(400).json({
@@ -51,26 +52,26 @@ exports.createProduct = async (req, res) => {
       IID: productId,
       productName,
       manufacturer,
+      units,
       type,
       drugs,
       storeQty,
-      marginPercentage,
-      AM,
-      BM,
-      CM,
-      DM,
-      EM,
       pricing,
-    });
+    }, { transaction });
+
+    await ProductMargin.create({ ...marginPercentage, IID: product.IID }, { transaction });
 
     const storeProductEntries = storeQty.map((store) => ({
       IID: product.IID,
       SID: store.storeId,
     }));
-    await StoreProduct.bulkCreate(storeProductEntries);
+    await StoreProduct.bulkCreate(storeProductEntries, { transaction });
+
+    await transaction.commit();
 
     res.status(201).json({ message: "Product details created successfully." });
   } catch (error) {
+    await transaction.rollback();
     res.status(500).json({ error: error.message });
   }
 };
@@ -83,6 +84,7 @@ exports.getAllProducts = async (req, res) => {
     const offset = (page - 1) * limit;
 
     const { count, rows: products } = await Product.findAndCountAll({
+      include: [{ model: ProductMargin }],
       limit,
       offset,
     });
@@ -159,6 +161,7 @@ exports.searchProduct = async (req, res) => {
       where: {
         [Op.or]: [{ productName: { [Op.iLike]: `%${searchQuery}%` } }],
       },
+      include: [{ model: ProductMargin }]
     });
 
     res.status(200).json(products || []);

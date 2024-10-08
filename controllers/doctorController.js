@@ -10,6 +10,10 @@ const { Op } = require("sequelize");
 const Store = require("../models/Store/Store");
 const Order = require("../models/Order/Order");
 const StoreBillingDetail = require("../models/Store/StoreBillingDetail");
+const PatientAddress = require("../models/Order/Adress");
+const Product = require("../models/Product/Product");
+const FrequentProducts = require("../models/Doctor/FrequentProducts");
+const Address = require("../models/Store/Address");
 
 exports.createDoctor = async (req, res) => {
   try {
@@ -182,9 +186,7 @@ exports.searchDoctor = async (req, res) => {
 
 exports.getAllPatients = async (req, res) => {
   const doctorId = req.userId;
-  console.log("doctorId", doctorId);
   const searchQuery = req.query.search || "";
-  console.log("searchQuery", searchQuery);
 
   try {
     const patients = await PatientDetails.findAll({
@@ -195,27 +197,24 @@ exports.getAllPatients = async (req, res) => {
           { surname: { [Op.iLike]: `%${searchQuery}%` } },
         ],
       },
+      include: [{ model: Order }, { model: PatientAddress }],
     });
 
     res.status(200).json(patients || []);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: error.message });
   }
 };
 
 exports.getDoctorDetail = async (req, res) => {
   const DID = req.userId;
   try {
-    const doctor = await Doctor.findByPk(DID, {
-      include: [
-        Compliances,
-        AccountCategory,
-        PersonalInfo,
-        ClinicAddress,
-        Store,
-      ],
+    const doctor = await Doctor.findOne({
+      where: { DID: DID },
+      include: [PersonalInfo],
     });
+
     if (!doctor) {
       return res.status(404).json({ message: "Doctor not found" });
     }
@@ -242,6 +241,7 @@ exports.getBillingDetails = async (req, res) => {
 
     const storeBillingDetail = await StoreBillingDetail.findOne({
       where: { SID: store.SID },
+      include: [{ model: Store, include: [{ model: Address }] }]
     });
     res.status(200).json(storeBillingDetail);
   } catch (err) {
@@ -265,6 +265,79 @@ exports.updateDoctorStatus = async (req, res) => {
     await doctor.update({ currentDoctorStatus });
 
     res.status(200).json({ message: "Doctor status updated" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.addProductsToFrequent = async (req, res) => {
+  try {
+    const DID = req.userId;
+    const { IID } = req.body;
+
+    const doctor = await Doctor.findOne({ where: { DID: DID } });
+    if (!doctor) {
+      return res.status(404).json({ message: "Doctor not found" });
+    }
+
+    const product = await Product.findOne({
+      where: { IID: IID },
+    });
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const existingFrequentProduct = await FrequentProducts.findOne({
+      where: { IID: IID }
+    })
+    console.log("existingFrequentProduct--", existingFrequentProduct)
+    if (!existingFrequentProduct) {
+      await FrequentProducts.create({
+        IID: product.IID,
+        DID: doctor.DID,
+      });
+    } else {
+      return res.status(404).json({ error: "Product is already added in frequent" });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Product added in frequent successfullyI" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getFrequentProducts = async (req, res) => {
+  try {
+    const DID = req.userId;
+
+    const doctor = await Doctor.findOne({ where: { DID: DID } });
+    if (!doctor) {
+      return res.status(404).json({ message: "Doctor not found" });
+    }
+
+    const frequentProducts = await FrequentProducts.findAll({
+      where: { DID: DID },
+      include: [{ model: Product }],
+    });
+
+    res.status(200).json(frequentProducts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+exports.removeFrequentProduct = async (req, res) => {
+  try {
+    const IID = req.params.id;
+
+    await FrequentProducts.destroy({
+      where: { IID: IID },
+    });
+
+    res.status(200).json({message: "Frequent product deleted successfully"});
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

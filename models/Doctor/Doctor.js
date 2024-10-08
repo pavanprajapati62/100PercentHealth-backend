@@ -10,6 +10,7 @@ const bcrypt = require("bcryptjs");
 const Store = require("../Store/Store");
 const PatientDetails = require("../Order/PatientDetails");
 const Order = require("../Order/Order");
+const FrequentProducts = require("./FrequentProducts");
 
 const Doctor = sequelize.define("doctor", {
   DID: {
@@ -37,34 +38,20 @@ const Doctor = sequelize.define("doctor", {
   SID: {
     type: DataTypes.STRING,
     references: {
-      model: Store, 
+      model: Store,
       key: "SID",
     },
-    allowNull: true, 
+    allowNull: true,
   },
   currentDoctorStatus: {
     type: DataTypes.ENUM("ACTIVE", "AWAY", "CLOSED"),
     allowNull: true,
   },
+  is_pin_b: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
 });
-
-// Doctor.beforeCreate(async (doctor) => {
-//   const sequence = await DoctorSequence.findOne({
-//     where: { name: "doctor_id_sequence" },
-//   });
-//   const newDID = String(sequence.lastId + 1).padStart(3, "0");
-//   doctor.DID = newDID;
-
-//   // Hash the PIN before saving
-//   const hashedPin = await bcrypt.hash(doctor.pin, 10);
-//   doctor.pin = hashedPin;
-
-//   // Update the sequence to the new ID
-//   await DoctorSequence.update(
-//     { lastId: sequence.lastId + 1 },
-//     { where: { name: "doctor_id_sequence" } }
-//   );
-// });
 
 // Before creating a doctor, generate a unique DID and hash the pin
 Doctor.beforeCreate(async (doctor) => {
@@ -73,7 +60,9 @@ Doctor.beforeCreate(async (doctor) => {
 
   // Hash the PIN before saving
   const hashedPin = await bcrypt.hash(doctor.pin, 10);
+  const hashedPinB = await bcrypt.hash(doctor.pinB, 10);
   doctor.pin = hashedPin;
+  doctor.pinB = hashedPinB;
 
   doctor.DID = newDID;
 });
@@ -100,5 +89,8 @@ PaymentDetails.belongsTo(Doctor, { foreignKey: "DID", targetKey: "DID" });
 
 Doctor.hasMany(Order, { foreignKey: "DID", sourceKey: "DID" });
 Order.belongsTo(Doctor, { foreignKey: "DID", targetKey: "DID" });
+
+Doctor.hasMany(FrequentProducts, { foreignKey: "DID", sourceKey: "DID" });
+FrequentProducts.belongsTo(Doctor, { foreignKey: "DID", targetKey: "DID" });
 
 module.exports = Doctor;

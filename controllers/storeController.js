@@ -34,142 +34,6 @@ exports.createStore = async (req, res) => {
     await Location.create({ ...location, SID: storeId });
     await Contact.create({ ...contact, SID: storeId });
 
-    if (billing) {
-      if (billing.applyAll) {
-        const allStores = await Store.findAll();
-
-        for (const store of allStores) {
-          const existingStoreBillingDetail = await StoreBillingDetail.findOne({
-            where: { SID: store.SID },
-          });
-
-          if (!existingStoreBillingDetail) {
-            await StoreBillingDetail.create({
-              SID: store.SID,
-              smallCartFee: smallCartFee ? smallCartFee.charges : null,
-              handlingFee: handlingFee ? handlingFee.charges : null,
-              deliveryChargesSameState: deliveryChargesSameState
-                ? deliveryChargesSameState.charges
-                : null,
-              deliveryChargesOtherState: deliveryChargesOtherState
-                ? deliveryChargesOtherState.charges
-                : null,
-            });
-          } else {
-            await StoreBillingDetail.update(
-              {
-                smallCartFee: smallCartFee
-                  ? smallCartFee.charges
-                  : existingStoreBillingDetail.smallCartFee,
-                handlingFee: handlingFee
-                  ? handlingFee.charges
-                  : existingStoreBillingDetail.handlingFee,
-                deliveryChargesSameState: deliveryChargesSameState
-                  ? deliveryChargesSameState.charges
-                  : existingStoreBillingDetail.deliveryChargesSameState,
-                deliveryChargesOtherState: deliveryChargesOtherState
-                  ? deliveryChargesOtherState.charges
-                  : existingStoreBillingDetail.deliveryChargesOtherState,
-              },
-              { where: { SID: store.SID } }
-            );
-          }
-        }
-
-        return res.status(201).json({ message: "Applied to all stores" });
-      } else {
-        if (smallCartFee && smallCartFee.storeTitle) {
-          const store = await Store.findOne({
-            where: { title: smallCartFee.storeTitle },
-          });
-          const existingStoreBillingDetail = await StoreBillingDetail.findOne({
-            where: { SID: store.SID },
-          });
-          if (!existingStoreBillingDetail) {
-            await StoreBillingDetail.create({
-              SID: store.SID,
-              smallCartFee: smallCartFee.charges,
-            });
-          } else {
-            await StoreBillingDetail.update(
-              {
-                smallCartFee: smallCartFee.charges,
-              },
-              { where: { SID: store.SID } }
-            );
-          }
-        }
-
-        if (handlingFee && handlingFee.storeTitle) {
-          const store = await Store.findOne({
-            where: { title: handlingFee.storeTitle },
-          });
-          const existingStoreBillingDetail = await StoreBillingDetail.findOne({
-            where: { SID: store.SID },
-          });
-          if (!existingStoreBillingDetail) {
-            await StoreBillingDetail.create({
-              SID: store.SID,
-              handlingFee: handlingFee.charges,
-            });
-          } else {
-            await StoreBillingDetail.update(
-              {
-                handlingFee: handlingFee.charges,
-              },
-              { where: { SID: store.SID } }
-            );
-          }
-        }
-
-        if (deliveryChargesSameState && deliveryChargesSameState.storeTitle) {
-          const store = await Store.findOne({
-            where: { title: handlingFee.storeTitle },
-          });
-          const existingStoreBillingDetail = await StoreBillingDetail.findOne({
-            where: { SID: store.SID },
-          });
-          if (!existingStoreBillingDetail) {
-            await StoreBillingDetail.create({
-              SID: store.SID,
-              deliveryChargesSameState: deliveryChargesSameState.charges,
-            });
-          } else {
-            await StoreBillingDetail.update(
-              {
-                deliveryChargesSameState: deliveryChargesSameState.charges,
-              },
-              { where: { SID: store.SID } }
-            );
-          }
-        }
-
-        if (deliveryChargesOtherState && deliveryChargesOtherState.storeTitle) {
-          const store = await Store.findOne({
-            where: { title: handlingFee.storeTitle },
-          });
-          const existingStoreBillingDetail = await StoreBillingDetail.findOne({
-            where: { SID: store.SID },
-          });
-          if (!existingStoreBillingDetail) {
-            await StoreBillingDetail.create({
-              SID: store.SID,
-              deliveryChargesOtherState: deliveryChargesOtherState.charges,
-            });
-          } else {
-            await StoreBillingDetail.update(
-              {
-                deliveryChargesOtherState: deliveryChargesOtherState.charges,
-              },
-              { where: { SID: store.SID } }
-            );
-          }
-        }
-
-        res.status(201).json({ message: "Applied" });
-      }
-    }
-
     res
       .status(201)
       .json({ message: "Store and related details created successfully." });
@@ -216,7 +80,7 @@ exports.getStoreById = async (req, res) => {
 exports.updateStore = async (req, res) => {
   try {
     const SID = req?.params?.id;
-    const { storeDetails, compliances, address, location, contact } = req.body;
+    const { storeDetails, compliances, address, location, contact, billing } = req.body;
 
     const store = await Store.findOne({
       where: { SID },
@@ -229,13 +93,71 @@ exports.updateStore = async (req, res) => {
     await Location.update(location, { where: { SID } });
     await Contact.update(contact, { where: { SID } });
 
+    if (billing) {
+      if (billing.applyAll) {
+        const allStores = await Store.findAll();
+
+        for (const store of allStores) {
+          const existingStoreBillingDetail = await StoreBillingDetail.findOne({
+            where: { SID: store.SID },
+          });
+
+          if (!existingStoreBillingDetail) {
+            await StoreBillingDetail.create({
+              SID: store.SID,
+              smallCartFee: billing.smallCartFee || null,
+              handlingFee: billing.handlingFee || null,
+              deliveryChargesSameState: billing.deliveryChargesSameState || null,
+              deliveryChargesOtherState: billing.deliveryChargesOtherState || null,
+              noDiscount: billing.no_discount || null,
+            });
+          } else {
+            await StoreBillingDetail.update(
+              {
+                smallCartFee: billing.smallCartFee || existingStoreBillingDetail.smallCartFee,
+                handlingFee: billing.handlingFee || existingStoreBillingDetail.handlingFee,
+                deliveryChargesSameState:
+                  billing.deliveryChargesSameState || existingStoreBillingDetail.deliveryChargesSameState,
+                deliveryChargesOtherState:
+                  billing.deliveryChargesOtherState || existingStoreBillingDetail.deliveryChargesOtherState,
+                noDiscount: billing.no_discount || existingStoreBillingDetail.noDiscount,
+              },
+              { where: { SID: store.SID } }
+            );
+          }
+        }
+      } else {
+        const updateBillingDetails = async (billingField, fieldName) => {
+          if (billingField) {
+            const existingStoreBillingDetail = await StoreBillingDetail.findOne({ where: { SID: store.SID } });
+
+            if (!existingStoreBillingDetail) {
+              const newBillingDetail = {};
+              newBillingDetail[fieldName] = billingField;
+              newBillingDetail.SID = store.SID;
+              await StoreBillingDetail.create(newBillingDetail);
+            } else {
+              const updateData = {};
+              updateData[fieldName] = billingField;
+              await StoreBillingDetail.update(updateData, { where: { SID: store.SID } });
+            }
+          }
+        };
+
+        await updateBillingDetails(billing.smallCartFee, 'smallCartFee');
+        await updateBillingDetails(billing.handlingFee, 'handlingFee');
+        await updateBillingDetails(billing.deliveryChargesSameState, 'deliveryChargesSameState');
+        await updateBillingDetails(billing.deliveryChargesOtherState, 'deliveryChargesOtherState');
+        await updateBillingDetails(billing.no_discount, 'noDiscount');
+      }
+    }
+
     res.status(200).json({ message: "Store updated successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// Assign multiple doctors to a store by admin
 exports.assignDoctorToStore = async (req, res) => {
   const { SID, doctorId } = req.body;
 
@@ -265,27 +187,6 @@ exports.assignDoctorToStore = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
-// Get all doctors for a specific store
-// exports.getDoctorsByStore = async (req, res) => {
-//   const { storeId } = req.params;
-
-//   try {
-//     // Find all doctors linked to this store
-//     const doctors = await Doctor.findAll({ where: { storeId } });
-
-//     if (!doctors.length) {
-//       return res
-//         .status(404)
-//         .json({ message: "No doctors found for this store" });
-//     }
-
-//     res.status(200).json(doctors);
-//   } catch (error) {
-//     console.error("Error fetching doctors by store:", error);
-//     res.status(500).json({ message: error.message });
-//   }
-// };
 
 exports.deleteStore = async (req, res) => {
   const SID = req.params.id;
@@ -331,9 +232,12 @@ exports.searchStore = async (req, res) => {
 exports.getStoreDetail = async (req, res) => {
   const SID = req.userId;
   try {
-    const store = await Store.findByPk(SID, {
-      include: [Compliances, Address, Location, Contact],
-    });
+    const store = await Store.findOne(
+      { where: { SID: SID } },
+      {
+        include: [Compliances, Address, Location, Contact],
+      }
+    );
     if (!store) {
       return res.status(404).json({ message: "Store not found" });
     }

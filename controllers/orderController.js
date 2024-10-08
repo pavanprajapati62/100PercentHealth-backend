@@ -105,7 +105,12 @@ exports.getOrderById = async (req, res) => {
 
 exports.getAllOrders = async (req, res) => {
   try {
-    const orders = await Order.findAll({
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    const offset = (page - 1) * limit;
+
+    const { count, rows: orders } = await Order.findAndCountAll({
       include: [
         PatientDetails,
         Billing,
@@ -117,7 +122,6 @@ exports.getAllOrders = async (req, res) => {
           include: [
             {
               model: PersonalInfo,
-              attributes: ["name", "surname"],
             },
             {
               model: ClinicAddress,
@@ -126,9 +130,17 @@ exports.getAllOrders = async (req, res) => {
           ],
         },
       ],
-      order: [['createdAt', 'ASC']] 
+      limit,
+      offset,
+      order: [['createdAt', 'ASC']], 
     });
-    res.status(200).json(orders);
+    res.status(200).json({
+      currentPage: page,
+      limit,
+      totalItems: count,
+      totalPages: Math.ceil(count / limit),
+      orders,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
