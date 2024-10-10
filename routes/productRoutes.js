@@ -18,7 +18,7 @@ router.get("/search-drug", searchDrug);
 router.post("/create", [verifyToken, isAdmin], createProduct);
 router.get("/all", [verifyToken, isStoreOrAdmin], getAllProducts);
 router.get("/:id", [verifyToken, isAdmin], getProductById);
-router.put("/:id", [verifyToken, isAdmin], updateProduct);
-router.delete("/:id", [verifyToken, isAdmin], deleteProduct);
+router.put("/:id", [verifyToken, isStoreOrAdmin], updateProduct); 
+router.delete("/:id", [verifyToken, isStoreOrAdmin], deleteProduct); 
 
 module.exports = router;
