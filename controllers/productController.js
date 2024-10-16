@@ -48,18 +48,24 @@ exports.createProduct = async (req, res) => {
       });
     }
 
-    const product = await Product.create({
-      IID: productId,
-      productName,
-      manufacturer,
-      units,
-      type,
-      drugs,
-      storeQty,
-      pricing,
-    }, { transaction });
+    const product = await Product.create(
+      {
+        IID: productId,
+        productName,
+        manufacturer,
+        units,
+        type,
+        drugs,
+        storeQty,
+        pricing,
+      },
+      { transaction }
+    );
 
-    await ProductMargin.create({ ...marginPercentage, IID: product.IID }, { transaction });
+    await ProductMargin.create(
+      { ...marginPercentage, IID: product.IID },
+      { transaction }
+    );
 
     const storeProductEntries = storeQty.map((store) => ({
       IID: product.IID,
@@ -119,16 +125,32 @@ exports.getProductById = async (req, res) => {
 
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
-  const updatedData = req.body;
+  const { updatedData, marginPercentage } = req.body;
 
   try {
-    const product = await Product.findByPk(id);
+    const product = await Product.findOne({
+      where: { IID: id },
+    });
 
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
 
     await product.update(updatedData);
+
+    if (marginPercentage) {
+      const [productMargin, created] = await ProductMargin.findOrCreate({
+        where: { IID: id }, 
+        defaults: {
+          ...marginPercentage, 
+          IID: id,
+        },
+      });
+
+      if (!created) {
+        await productMargin.update(marginPercentage);
+      }
+    }
     res.status(200).json({ message: "Product updated successfully", product });
   } catch (error) {
     console.error("Error updating product:", error);
@@ -161,7 +183,7 @@ exports.searchProduct = async (req, res) => {
       where: {
         [Op.or]: [{ productName: { [Op.iLike]: `%${searchQuery}%` } }],
       },
-      include: [{ model: ProductMargin }]
+      include: [{ model: ProductMargin }],
     });
 
     res.status(200).json(products || []);

@@ -225,23 +225,28 @@ exports.getDoctorDetail = async (req, res) => {
 };
 
 exports.getBillingDetails = async (req, res) => {
-  const DID = req.userId;
+  const id = req.userId;
   try {
     const doctor = await Doctor.findOne({
-      where: { DID: DID },
+      where: { DID: id },
     });
-    if (!doctor) return res.status(404).json({ error: "Doctor not found" });
 
-    const store = await Store.findOne({
-      where: { SID: doctor.SID },
-    });
+    if (id.startsWith("DID")) {
+      var store = await Store.findOne({
+        where: { SID: doctor.SID },
+      });
+    } else {
+      var store = await Store.findOne({
+        where: { SID: id },
+      });
+    }
     if (!store) {
       return res.status(404).json({ message: "Store not found" });
     }
 
     const storeBillingDetail = await StoreBillingDetail.findOne({
       where: { SID: store.SID },
-      include: [{ model: Store, include: [{ model: Address }] }]
+      include: [{ model: Store, include: [{ model: Address }] }],
     });
     res.status(200).json(storeBillingDetail);
   } catch (err) {
@@ -288,16 +293,18 @@ exports.addProductsToFrequent = async (req, res) => {
     }
 
     const existingFrequentProduct = await FrequentProducts.findOne({
-      where: { IID: IID }
-    })
-    console.log("existingFrequentProduct--", existingFrequentProduct)
+      where: { IID: IID },
+    });
     if (!existingFrequentProduct) {
       await FrequentProducts.create({
         IID: product.IID,
         DID: doctor.DID,
+        SID: doctor.SID,
       });
     } else {
-      return res.status(404).json({ error: "Product is already added in frequent" });
+      return res
+        .status(404)
+        .json({ error: "Product is already added in frequent" });
     }
 
     res
@@ -310,24 +317,30 @@ exports.addProductsToFrequent = async (req, res) => {
 
 exports.getFrequentProducts = async (req, res) => {
   try {
-    const DID = req.userId;
+    const id = req.userId;
 
-    const doctor = await Doctor.findOne({ where: { DID: DID } });
-    if (!doctor) {
-      return res.status(404).json({ message: "Doctor not found" });
+    if (id.startsWith("DID")) {
+      const doctor = await Doctor.findOne({ where: { DID: id } });
+      if (!doctor) {
+        return res.status(404).json({ message: "Doctor not found" });
+      }
+
+      var frequentProducts = await FrequentProducts.findAll({
+        where: { DID: id },
+        include: [{ model: Product }],
+      });
+    } else {
+      var frequentProducts = await FrequentProducts.findAll({
+        where: { SID: id },
+        include: [{ model: Product }],
+      });
     }
-
-    const frequentProducts = await FrequentProducts.findAll({
-      where: { DID: DID },
-      include: [{ model: Product }],
-    });
 
     res.status(200).json(frequentProducts);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
-
 
 exports.removeFrequentProduct = async (req, res) => {
   try {
@@ -337,7 +350,7 @@ exports.removeFrequentProduct = async (req, res) => {
       where: { IID: IID },
     });
 
-    res.status(200).json({message: "Frequent product deleted successfully"});
+    res.status(200).json({ message: "Frequent product deleted successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

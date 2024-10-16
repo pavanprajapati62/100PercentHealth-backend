@@ -15,6 +15,8 @@ const {
   removeDoctorFromStore,
   getDoctorsNotAssigned,
   updateStoreStatus,
+  getOrders,
+  getProductsOfDoctor,
   // getDoctorsByStore,
 } = require("../controllers/storeController");
 const {
@@ -22,17 +24,18 @@ const {
   isAdmin,
   isStore,
   isStoreOrDoctor,
+  isStoreOrAdmin,
 } = require("../middlewares/roleMiddleware");
-
-// Admin routes for managing stores
 
 router.post("/create", [verifyToken, isAdmin], createStore);
 router.post("/assign-doctors", [verifyToken, isAdmin], assignDoctorToStore);
 // router.get("/store/:SID/doctors", [verifyToken, isAdmin], getDoctorsByStore);
 router.get("/search-store", searchStore);
-router.get("/get-doctors/:id", [verifyToken, isAdmin], getDoctorsOfStore);
+router.post("/orders", [verifyToken, isStore], getOrders)
+router.get("/get-doctors/:id", [verifyToken, isStoreOrAdmin], getDoctorsOfStore);
 router.get("/get-doctors", [verifyToken, isAdmin], getDoctorsNotAssigned);
-router.get("/get-products", [verifyToken, isStoreOrDoctor], getProductsOfStore);
+router.get("/get-products", [verifyToken, isStoreOrDoctor], getProductsOfDoctor);
+router.get("/get-store-products", [verifyToken, isStore], getProductsOfStore);
 router.post("/billing", billingStore);
 router.get("/all", [verifyToken, isAdmin], getAllStores);
 router.get("/get-store-detail", [verifyToken, isStore], getStoreDetail);

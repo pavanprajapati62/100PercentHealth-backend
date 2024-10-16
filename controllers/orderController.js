@@ -1,3 +1,4 @@
+const { sequelize } = require("../config/db");
 const ClinicAddress = require("../models/Doctor/ClinicAddress");
 const Doctor = require("../models/Doctor/Doctor");
 const PersonalInfo = require("../models/Doctor/PersonalInfo");
@@ -10,64 +11,88 @@ const OrderProduct = require("../models/Order/Product");
 const Store = require("../models/Store/Store");
 
 exports.createOrder = async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
     const id = req.userId;
-    const { patient, products, billing, delivery, payment, prescription } =
+    const { patient, products, billing, delivery, payment, prescription, DID } =
       req.body;
 
-    const doctor = await Doctor.findOne({
-      where: { DID: id },
-    });
-    if (!doctor) return res.status(404).json({ error: "Doctor not found" });
+    if (id.startsWith("DID")) {
+      var doctor = await Doctor.findOne({
+        where: { DID: id },
+      });
+      if (!doctor) return res.status(404).json({ error: "Doctor not found" });
 
-    const store = await Store.findOne({
-      where: { SID: doctor.SID },
-    });
+      var store = await Store.findOne({
+        where: { SID: doctor.SID },
+      });
+    } else {
+      var doctor = await Doctor.findOne({
+        where: { DID: DID },
+      });
+      if (!doctor) return res.status(404).json({ error: "Doctor not found" });
+
+      var store = await Store.findOne({
+        where: { SID: doctor.SID },
+      });
+    }
     if (!store) {
       return res.status(404).json({ message: "Store not found" });
     }
 
-    const order = await Order.create({
-      payment,
-      isClinic: delivery.isClinic || false,
-      isCollect: delivery.isCollect || false,
-      isAddress: delivery.isAddress || false,
-      prescription: prescription || "",
-      SID: store.SID,
-      DID: doctor.DID,
-    });
+    const order = await Order.create(
+      {
+        payment,
+        isClinic: delivery.isClinic || false,
+        isCollect: delivery.isCollect || false,
+        isAddress: delivery.isAddress || false,
+        prescription: prescription || "",
+        SID: store.SID,
+        DID: doctor.DID,
+      },
+      { transaction }
+    );
     const orderOID = order.OID;
 
     if (!orderOID) {
       throw new Error("Failed to generate OID for the order.");
     }
 
-    const patientDetail = await PatientDetails.create({
-      ...patient,
-      OID: orderOID,
-      DID: doctor.DID,
-    });
-    await Billing.create({ ...billing, OID: orderOID });
+    const patientDetail = await PatientDetails.create(
+      {
+        ...patient,
+        OID: orderOID,
+        DID: doctor.DID,
+      },
+      { transaction }
+    );
+
+    await Billing.create({ ...billing, OID: orderOID }, { transaction });
 
     if (delivery.address) {
-      await PatientAddress.create({
-        ...delivery.address,
-        PID: patientDetail.PID,
-        OID: orderOID,
-      });
+      await PatientAddress.create(
+        {
+          ...delivery.address,
+          PID: patientDetail.PID,
+          OID: orderOID,
+        },
+        { transaction }
+      );
     }
 
     if (products && products.length > 0) {
       const productPromises = products.map((product) =>
-        OrderProduct.create({ ...product, OID: orderOID })
+        OrderProduct.create({ ...product, OID: orderOID }, { transaction })
       );
       await Promise.all(productPromises);
     }
 
+    await transaction.commit();
     res
       .status(201)
       .json({ message: "Order and related details created successfully." });
   } catch (err) {
+    await transaction.rollback();
     res.status(500).json({ error: err.message });
   }
 };
@@ -132,7 +157,7 @@ exports.getAllOrders = async (req, res) => {
       ],
       limit,
       offset,
-      order: [['createdAt', 'ASC']], 
+      order: [["createdAt", "ASC"]],
     });
     res.status(200).json({
       currentPage: page,
