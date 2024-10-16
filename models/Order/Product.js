@@ -87,6 +87,10 @@ const OrderProduct = sequelize.define("orderProduct", {
     type: DataTypes.ENUM("A/F", "B/F", "X"),
     allowNull: false,
   },
+  extra: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 });
 
 module.exports = OrderProduct;

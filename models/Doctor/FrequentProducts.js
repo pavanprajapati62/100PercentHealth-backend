@@ -17,7 +17,15 @@ const FrequentProducts = sequelize.define("frequentProducts", {
       key: "DID",
     },
     allowNull: false,
-  },  
+  }, 
+  SID: {
+    type: DataTypes.STRING,
+    references: {
+      model: "stores",
+      key: "SID",
+    },
+    allowNull: true,
+  }, 
 });
 
 module.exports = FrequentProducts;

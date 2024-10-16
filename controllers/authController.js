@@ -311,7 +311,6 @@ exports.searchCustomerData = async (req, res) => {
       });
     }
   } catch (error) {
-    console.log("eeeeeeeeeeeeeee", error)
     res.status(500).json({ error: error.message });
   }
 };

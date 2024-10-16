@@ -7,6 +7,7 @@ const Contact = require("./Contact");
 const bcrypt = require("bcryptjs");
 const Order = require("../Order/Order");
 const StoreBillingDetail = require("./StoreBillingDetail");
+const FrequentProducts = require("../Doctor/FrequentProducts");
 
 const Store = sequelize.define("store", {
   SID: {
@@ -62,5 +63,8 @@ Order.belongsTo(Store, { foreignKey: "SID", targetKey: "SID" });
 
 Store.hasOne(StoreBillingDetail, { foreignKey: 'SID', sourceKey: 'SID' });
 StoreBillingDetail.belongsTo(Store, { foreignKey: 'SID', targetKey: 'SID' });
+
+Store.hasMany(FrequentProducts, { foreignKey: "SID", sourceKey: "SID" });
+FrequentProducts.belongsTo(Store, { foreignKey: "SID", targetKey: "SID" });
 
 module.exports = Store;

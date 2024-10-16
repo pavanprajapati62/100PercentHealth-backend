@@ -16,6 +16,10 @@ const DoctorCompliances = require("../models/Doctor/Compliances");
 const ClinicAddress = require("../models/Doctor/ClinicAddress");
 const EmailInfo = require("../models/Doctor/EmailInfo");
 const PaymentDetails = require("../models/Doctor/PaymentDetails");
+const PatientDetails = require("../models/Order/PatientDetails");
+const Billing = require("../models/Order/Billing");
+const OrderProduct = require("../models/Order/Product");
+const PatientAddress = require("../models/Order/Adress");
 
 exports.createStore = async (req, res) => {
   try {
@@ -440,7 +444,7 @@ exports.getDoctorsNotAssigned = async (req, res) => {
   }
 };
 
-exports.getProductsOfStore = async (req, res) => {
+exports.getProductsOfDoctor = async (req, res) => {
   try {
     const id = req.userId;
     let storeSID;
@@ -458,6 +462,35 @@ exports.getProductsOfStore = async (req, res) => {
     });
     res.status(200).json(products);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getProductsOfStore = async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const offset = (page - 1) * limit;
+
+  try {
+    const id = req.userId;
+
+    const { rows: products, count } = await StoreProduct.findAndCountAll({
+      where: { SID: id },
+      attributes: [],
+      include: [Product],
+      limit,
+      offset,
+    });
+
+    res.status(200).json({
+      currentPage: page,
+      limit,
+      totalItems: count,
+      totalPages: Math.ceil(count / limit),
+      data: products,
+    });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -509,3 +542,86 @@ exports.updateStoreStatus = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.getOrders = async (req, res) => {
+  try {
+    const SID = req.userId;
+
+    const { addressType = "", orderType = "" } = req.body; 
+
+    const validAddressTypes = ["isClinic", "isCollect", "isAddress"];
+    const validOrderTypes = ["isPacked", "isDispatched", "isDelivered", "isCancelled", "new"];
+
+    let whereConditions = {
+      SID,
+    };
+
+    let limit = parseInt(req.query.limit) || 10;
+    let order = [["createdAt", "ASC"]];
+
+    if (addressType.length === 0 && orderType.length === 0) {
+      whereConditions = { SID };
+    } else {
+      if (addressType.length > 0 && !validAddressTypes.includes(addressType)) {
+        return res.status(400).json({ error: "Invalid addressType" });
+      }
+      if (orderType.length > 0 && !validOrderTypes.includes(orderType)) {
+        return res.status(400).json({ error: "Invalid orderType" });
+      }
+
+      if (orderType === "new") {
+        order = [["createdAt", "DESC"]]; 
+        limit = 10;
+        if (addressType.length > 0) {
+          whereConditions[addressType] = true; 
+        }
+      } else {
+        if (addressType.length > 0) {
+          whereConditions[addressType] = true; 
+        }
+        if (orderType.length > 0) {
+          whereConditions[orderType] = true; 
+        }
+      }
+    }
+
+    const page = parseInt(req.query.page) || 1;
+    const offset = (page - 1) * limit;
+
+    const { count, rows: orders } = await Order.findAndCountAll({
+      where: whereConditions,
+      include: [
+        PatientDetails,
+        Billing,
+        PatientAddress,
+        OrderProduct,
+        {
+          model: Doctor,
+          attributes: ["DID", "contactNumber", "role"],
+          include: [
+            {
+              model: PersonalInfo,
+            },
+            {
+              model: ClinicAddress,
+              attributes: ["premisesName", "clinicContactNumber"],
+            },
+          ],
+        },
+      ],
+      limit,
+      offset,
+      order, 
+    });
+
+    res.status(200).json({
+      currentPage: page,
+      limit,
+      totalItems: count,
+      totalPages: Math.ceil(count / limit),
+      orders,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
