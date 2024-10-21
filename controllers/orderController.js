@@ -1,6 +1,8 @@
 const { sequelize } = require("../config/db");
+const AccountCategory = require("../models/Doctor/AccountCategory");
 const ClinicAddress = require("../models/Doctor/ClinicAddress");
 const Doctor = require("../models/Doctor/Doctor");
+const DoctorOrderMargins = require("../models/Doctor/DoctorOrderMargins");
 const PersonalInfo = require("../models/Doctor/PersonalInfo");
 const PatientAddress = require("../models/Order/Adress");
 const Billing = require("../models/Order/Billing");
@@ -8,14 +10,25 @@ const Invoice = require("../models/Order/Invoice");
 const Order = require("../models/Order/Order");
 const PatientDetails = require("../models/Order/PatientDetails");
 const OrderProduct = require("../models/Order/Product");
+const Product = require("../models/Product/Product");
+const ProductMargin = require("../models/Product/ProductMargin");
+const StoreProduct = require("../models/Product/StoreProduct");
 const Store = require("../models/Store/Store");
 
 exports.createOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const id = req.userId;
-    const { patient, products, billing, delivery, payment, prescription, DID } =
-      req.body;
+    const {
+      patient,
+      products,
+      billing,
+      delivery,
+      payment,
+      prescription,
+      DID,
+      filePath,
+    } = req.body;
 
     if (id.startsWith("DID")) {
       var doctor = await Doctor.findOne({
@@ -49,6 +62,7 @@ exports.createOrder = async (req, res) => {
         prescription: prescription || "",
         SID: store.SID,
         DID: doctor.DID,
+        filePath: filePath || "",
       },
       { transaction }
     );
@@ -82,7 +96,10 @@ exports.createOrder = async (req, res) => {
 
     if (products && products.length > 0) {
       const productPromises = products.map((product) =>
-        OrderProduct.create({ ...product, OID: orderOID }, { transaction })
+        OrderProduct.create(
+          { ...product, OID: orderOID, IID: product?.productId, SID: store.SID  },
+          { transaction }
+        )
       );
       await Promise.all(productPromises);
     }
@@ -135,7 +152,19 @@ exports.getAllOrders = async (req, res) => {
 
     const offset = (page - 1) * limit;
 
+    const filter = req.query?.filter || "all";
+
+    let whereClause = {};
+    if (filter === "isClinic") {
+      whereClause.isClinic = true;
+    } else if (filter === "isCollect") {
+      whereClause.isCollect = true;
+    } else if (filter === "isAddress") {
+      whereClause.isAddress = true;
+    }
+
     const { count, rows: orders } = await Order.findAndCountAll({
+      where: whereClause,
       include: [
         PatientDetails,
         Billing,
@@ -157,7 +186,7 @@ exports.getAllOrders = async (req, res) => {
       ],
       limit,
       offset,
-      order: [["createdAt", "ASC"]],
+      order: [["createdAt", "DESC"]],
     });
     res.status(200).json({
       currentPage: page,
@@ -250,20 +279,153 @@ exports.deleteOrder = async (req, res) => {
   }
 };
 
+const getMargin = (mrp, categoryPercentage) => {
+  const margin = (mrp * categoryPercentage) / 100;
+  return parseFloat(margin.toFixed(2));
+}
+
+const getDoctorMargin = async (orderId, doctorId, orderProducts) => {
+  try {
+    const doctor = await Doctor.findOne({
+      where: { DID: doctorId },
+      include: [{ model: AccountCategory }],
+    });
+    const doctorData = doctor.get({ plain: true });
+    
+    let totalMarginPercentage = 0;
+    for(let i = 0; i < orderProducts.length; i++) {
+      const { IID, mrp, gst } = orderProducts[i];
+      const product = await Product.findOne({
+        where: { IID: IID },
+        include: [{ model: ProductMargin }],
+      });
+      const productData = product?.get({ plain: true });
+      
+      const doctorCategory = doctorData?.accountCategory?.category;
+      const categoryPercentage = productData?.productMargin[doctorCategory];
+
+      if (categoryPercentage !== undefined) {
+        // const margin = getMargin(productData?.pricing?.mrp, categoryPercentage);
+        // const margin = getMargin(mrp, categoryPercentage);
+        let mrpCalculation = (mrp * gst) / 100;
+        mrpCalculation = Math.floor(mrpCalculation);
+        let mrpExuldingGst = mrp - mrpCalculation;
+        const margin = getMargin(mrpExuldingGst, categoryPercentage);
+        totalMarginPercentage += margin;
+      }
+    }
+
+    await DoctorOrderMargins.create({
+      DID: doctorId,
+      OID: orderId,
+      marginPercentage: totalMarginPercentage
+    })
+
+    return totalMarginPercentage;
+  } catch (error) {
+    console.error("Error fetching doctor margin:", error);
+    throw error;
+  }
+};
+
 exports.updateOrderStatus = async (req, res) => {
   const OID = req.params.id;
   const { isAccepted, isPacked, isDispatched, isDelivered } = req.body;
 
   try {
-    const order = await Order.findOne({ where: { OID } });
+    const order = await Order.findOne({
+      where: { OID },
+      include: [{ model: OrderProduct }],
+    });
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
+    const orderData = order.get({ plain: true });
+
+    let invoiceData = null;
 
     if (isAccepted) {
+      // for(let i = 0; i < orderData?.orderProducts.length; i++) {
+      //   const { IID, orderUnits } = orderData?.orderProducts[i];
+      //   const product = await Product.findOne({
+      //     where: { IID: IID },
+      //   });
+      //   const productData = product?.get({ plain: true });
+
+      //   if (productData?.productStock < orderUnits) {
+      //     return res.status(404).json({
+      //       message: `Product ${IID} stock is less than the required units`,
+      //     });
+      //   }
+      // }
+
+      for(let i = 0; i < orderData.orderProducts.length; i++) {
+        const { IID, orderUnits, SID, productName } = orderData.orderProducts[i];
+        const storeProduct = await StoreProduct.findOne({
+          where: { IID: IID, SID: SID, productName: productName },
+        });
+        const storeProductData = storeProduct?.get({ plain: true });
+
+        if (storeProductData?.storeStock < orderUnits) {
+          return res.status(404).json({
+            message: `Store ${SID} stock is less than the required units`,
+          });
+        }
+      }
+
+      try {
+        await sequelize.transaction(async (t) => {
+          for (let i = 0; i < orderData?.orderProducts.length; i++) {
+            const { IID, orderUnits } = orderData?.orderProducts[i];
+    
+            const product = await Product.findOne({ where: { IID }, transaction: t });
+            const newStock = product.productStock - orderUnits;
+    
+            await product.update({ productStock: newStock }, { transaction: t });
+          }
+        });
+      } catch (error) {
+        return res.status(500).json({ message: "An error occurred while processing the order" });
+      }
+
+      try {
+        await sequelize.transaction(async (t) => {
+          for (let i = 0; i < orderData?.orderProducts.length; i++) {
+            const { IID, orderUnits, SID, productName } = orderData?.orderProducts[i];
+    
+            const storeProduct = await StoreProduct.findOne({ where: { IID: IID, SID: SID, productName: productName }, transaction: t });
+            const newStock = storeProduct.storeStock - orderUnits;
+    
+            await storeProduct.update({ storeStock: newStock }, { transaction: t });
+          }
+        });
+      } catch (error) {
+        return res.status(500).json({ message: "An error occurred while processing the order" });
+      }
+
       order.isAccepted = true;
       order.orderStatus = "Accepted";
+
+      const { payableAmount } = await Billing.findOne({
+        where: { OID: OID },
+      });
+
+      const invoiceCount = await Invoice.count();
+      const newIVID = `IVID${String(invoiceCount + 1).padStart(3, "0")}`;
+
+      invoiceData = await Invoice.create({
+        IVID: newIVID,
+        OID,
+        invoiceNo: newIVID,
+        invoiceAmount: payableAmount,
+      });
+
+      var doctorMargin = await getDoctorMargin(
+        orderData.OID,
+        orderData.DID,
+        orderData?.orderProducts
+      );
     }
     if (isPacked) {
       order.isPacked = true;
@@ -280,9 +442,17 @@ exports.updateOrderStatus = async (req, res) => {
 
     await order.save();
 
-    return res
-      .status(200)
-      .json({ message: "Order status updated successfully" });
+    if (invoiceData !== null) {
+      return res.status(200).json({
+        message: "Order status updated and invoice created successfully",
+        invoiceData,
+        doctorMargin
+      });
+    } else {
+      return res
+        .status(200)
+        .json({ message: "Order status updated successfully" });
+    }
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

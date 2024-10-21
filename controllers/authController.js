@@ -19,6 +19,11 @@ exports.adminSignUp = async (req, res) => {
         .send({ message: "Username and PIN are required." });
     }
 
+    const existingUser = await Admin.findOne({ where: { username } });
+    if(existingUser) {
+      return res.status(400).json({ message: "Username already exist" });
+    }
+
     const user = await authService.signUp(username, pin);
     res.status(201).send(user);
   } catch (error) {
@@ -50,7 +55,10 @@ exports.doctorLogin = async (req, res) => {
   const { contactNumber, pin } = req.body;
 
   try {
-    // Check if doctor exists
+    if(contactNumber === "" || pin === "" ) {
+      return res.status(404).json({ message: "Provide credential" });
+    }
+
     const doctor = await Doctor.findOne({ where: { contactNumber } });
     if (!doctor) {
       return res.status(404).json({ message: "Doctor not found" });
@@ -74,17 +82,21 @@ exports.doctorLogin = async (req, res) => {
       return res.status(401).json({ message: "Invalid PIN" });
     }
 
+    doctor.currentDoctorStatus = "ACTIVE"
+    await doctor.save();
+
     const token = jwt.sign(
       { DID: doctor.DID, role: doctor.role },
       process.env.JWT_SECRET,
       {
-        expiresIn: "1h",
+        expiresIn: "24h",
       }
     );
 
     res.status(200).json({
       message: "Login successful",
       token,
+      status: doctor.currentDoctorStatus,
       isPinB: doctor.is_pin_b,
     });
   } catch (error) {
@@ -97,30 +109,31 @@ exports.storeLogin = async (req, res) => {
   const { username, pin } = req.body;
 
   try {
-    // Check if store exists
     const store = await Store.findOne({ where: { username } });
     if (!store) {
       return res.status(404).json({ message: "Store not found" });
     }
 
-    // Check if the pin matches
     const isMatch = await bcrypt.compare(pin, store.pin);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid PIN" });
     }
 
-    // Generate JWT Token
+    store.currentStoreStatus = "ACTIVE"
+    await store.save();
+
     const token = jwt.sign(
       { SID: store.SID, role: store.role },
       process.env.JWT_SECRET,
       {
-        expiresIn: "1h",
+        expiresIn: "24h",
       }
     );
 
     res.status(200).json({
       message: "Login successful",
       token,
+      status: store.currentStoreStatus,
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -163,6 +176,7 @@ exports.searchOrderData = async (req, res) => {
           { model: Order, include: [{ model: PatientDetails }] },
           { model: PatientDetails },
         ],
+        order: [["createdAt", "DESC"]],
         distinct: true,
         limit,
         offset,
@@ -187,6 +201,7 @@ exports.searchOrderData = async (req, res) => {
             model: PatientDetails,
           },
         ],
+        order: [["createdAt", "DESC"]],
         distinct: true,
         limit,
         offset,
@@ -208,6 +223,7 @@ exports.searchOrderData = async (req, res) => {
             include: [{ model: PersonalInfo }],
           },
         ],
+        order: [["createdAt", "DESC"]],
         distinct: true,
         limit,
         offset,
@@ -245,6 +261,7 @@ exports.searchCustomerData = async (req, res) => {
           },
         },
         include: [{ model: PatientAddress }, { model: Order }],
+        order: [["createdAt", "DESC"]],
       });
       res.status(200).json(phoneResult || []);
     } else {
@@ -257,6 +274,7 @@ exports.searchCustomerData = async (req, res) => {
             },
           },
           include: [{ model: PatientAddress }, { model: Order }],
+          order: [["createdAt", "DESC"]],
           limit,
           offset,
         });
@@ -279,6 +297,7 @@ exports.searchCustomerData = async (req, res) => {
               ],
             },
           ],
+          order: [["createdAt", "DESC"]],
           distinct: true,
           limit,
           offset,
@@ -294,6 +313,7 @@ exports.searchCustomerData = async (req, res) => {
             ],
           },
           include: [{ model: PatientAddress }, { model: Order }],
+          order: [["createdAt", "DESC"]],
           distinct: true,
           limit,
           offset,
@@ -332,6 +352,7 @@ exports.getAllPatients = async (req, res) => {
         ],
       },
       include: [{ model: Order }, { model: PatientAddress }],
+      order: [["createdAt", "DESC"]],
       limit,
       offset,
     });

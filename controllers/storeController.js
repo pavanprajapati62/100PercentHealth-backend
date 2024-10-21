@@ -9,7 +9,6 @@ const Store = require("../models/Store/Store");
 const StoreBillingDetail = require("../models/Store/StoreBillingDetail");
 const StoreProduct = require("../models/Product/StoreProduct");
 const Product = require("../models/Product/Product");
-const Admin = require("../models/Admin");
 const PersonalInfo = require("../models/Doctor/PersonalInfo");
 const AccountCategory = require("../models/Doctor/AccountCategory");
 const DoctorCompliances = require("../models/Doctor/Compliances");
@@ -20,6 +19,7 @@ const PatientDetails = require("../models/Order/PatientDetails");
 const Billing = require("../models/Order/Billing");
 const OrderProduct = require("../models/Order/Product");
 const PatientAddress = require("../models/Order/Adress");
+const DoctorOrderMargins = require("../models/Doctor/DoctorOrderMargins");
 
 exports.createStore = async (req, res) => {
   try {
@@ -53,6 +53,7 @@ exports.getAllStores = async (req, res) => {
   try {
     const stores = await Store.findAll({
       include: [Compliances, Address, Location, Contact, Order],
+      order: [["createdAt", "DESC"]],
     });
     res.status(200).json(stores);
   } catch (error) {
@@ -67,7 +68,14 @@ exports.getStoreById = async (req, res) => {
   try {
     const store = await Store.findOne({
       where: { SID },
-      include: [Compliances, Address, Location, Contact, Order],
+      include: [
+        Compliances,
+        Address,
+        Location,
+        Contact,
+        Order,
+        StoreBillingDetail,
+      ],
     });
 
     if (!store) {
@@ -84,7 +92,8 @@ exports.getStoreById = async (req, res) => {
 exports.updateStore = async (req, res) => {
   try {
     const SID = req?.params?.id;
-    const { storeDetails, compliances, address, location, contact, billing } = req.body;
+    const { storeDetails, compliances, address, location, contact, billing } =
+      req.body;
 
     const store = await Store.findOne({
       where: { SID },
@@ -111,20 +120,30 @@ exports.updateStore = async (req, res) => {
               SID: store.SID,
               smallCartFee: billing.smallCartFee || null,
               handlingFee: billing.handlingFee || null,
-              deliveryChargesSameState: billing.deliveryChargesSameState || null,
-              deliveryChargesOtherState: billing.deliveryChargesOtherState || null,
+              deliveryChargesSameState:
+                billing.deliveryChargesSameState || null,
+              deliveryChargesOtherState:
+                billing.deliveryChargesOtherState || null,
               noDiscount: billing.no_discount || null,
+              applyAll: billing.applyAll,
             });
           } else {
             await StoreBillingDetail.update(
               {
-                smallCartFee: billing.smallCartFee || existingStoreBillingDetail.smallCartFee,
-                handlingFee: billing.handlingFee || existingStoreBillingDetail.handlingFee,
+                smallCartFee:
+                  billing.smallCartFee ||
+                  existingStoreBillingDetail.smallCartFee,
+                handlingFee:
+                  billing.handlingFee || existingStoreBillingDetail.handlingFee,
                 deliveryChargesSameState:
-                  billing.deliveryChargesSameState || existingStoreBillingDetail.deliveryChargesSameState,
+                  billing.deliveryChargesSameState ||
+                  existingStoreBillingDetail.deliveryChargesSameState,
                 deliveryChargesOtherState:
-                  billing.deliveryChargesOtherState || existingStoreBillingDetail.deliveryChargesOtherState,
-                noDiscount: billing.no_discount || existingStoreBillingDetail.noDiscount,
+                  billing.deliveryChargesOtherState ||
+                  existingStoreBillingDetail.deliveryChargesOtherState,
+                noDiscount:
+                  billing.no_discount || existingStoreBillingDetail.noDiscount,
+                applyAll: billing.applyAll,
               },
               { where: { SID: store.SID } }
             );
@@ -133,7 +152,9 @@ exports.updateStore = async (req, res) => {
       } else {
         const updateBillingDetails = async (billingField, fieldName) => {
           if (billingField) {
-            const existingStoreBillingDetail = await StoreBillingDetail.findOne({ where: { SID: store.SID } });
+            const existingStoreBillingDetail = await StoreBillingDetail.findOne(
+              { where: { SID: store.SID } }
+            );
 
             if (!existingStoreBillingDetail) {
               const newBillingDetail = {};
@@ -143,16 +164,25 @@ exports.updateStore = async (req, res) => {
             } else {
               const updateData = {};
               updateData[fieldName] = billingField;
-              await StoreBillingDetail.update(updateData, { where: { SID: store.SID } });
+              await StoreBillingDetail.update(updateData, {
+                where: { SID: store.SID },
+              });
             }
           }
         };
 
-        await updateBillingDetails(billing.smallCartFee, 'smallCartFee');
-        await updateBillingDetails(billing.handlingFee, 'handlingFee');
-        await updateBillingDetails(billing.deliveryChargesSameState, 'deliveryChargesSameState');
-        await updateBillingDetails(billing.deliveryChargesOtherState, 'deliveryChargesOtherState');
-        await updateBillingDetails(billing.no_discount, 'noDiscount');
+        await updateBillingDetails(billing.smallCartFee, "smallCartFee");
+        await updateBillingDetails(billing.handlingFee, "handlingFee");
+        await updateBillingDetails(
+          billing.deliveryChargesSameState,
+          "deliveryChargesSameState"
+        );
+        await updateBillingDetails(
+          billing.deliveryChargesOtherState,
+          "deliveryChargesOtherState"
+        );
+        await updateBillingDetails(billing.no_discount, "noDiscount");
+        await updateBillingDetails(billing.applyAll, "applyAll");
       }
     }
 
@@ -195,6 +225,15 @@ exports.assignDoctorToStore = async (req, res) => {
 exports.deleteStore = async (req, res) => {
   const SID = req.params.id;
   try {
+    await StoreProduct.destroy({ where: { SID } });
+    
+    const orders = await Order.findAll({ where: { SID } });
+    const orderIds = orders?.map(order => order?.OID);
+
+    await DoctorOrderMargins.destroy({ where: { OID: orderIds } });
+    await OrderProduct.destroy({ where: { SID } });
+    await Order.destroy({ where: { SID } });
+    
     const store = await Store.destroy({
       where: { SID: SID },
     });
@@ -225,6 +264,7 @@ exports.searchStore = async (req, res) => {
           { username: { [Op.iLike]: `%${searchQuery}%` } },
         ],
       },
+      order: [["createdAt", "DESC"]],
     });
 
     res.status(200).json(stores || []);
@@ -245,7 +285,14 @@ exports.getStoreDetail = async (req, res) => {
     if (!store) {
       return res.status(404).json({ message: "Store not found" });
     }
-    res.status(200).json(store);
+
+    const lastOrder = await Order.findOne({
+      where: { SID: SID },
+      order: [["createdAt", "DESC"]],
+      limit: 1,
+    });
+
+    res.status(200).json({ store, lastOrder });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -437,6 +484,7 @@ exports.getDoctorsNotAssigned = async (req, res) => {
         EmailInfo,
         PaymentDetails,
       ],
+      order: [["createdAt", "DESC"]],
     });
     res.status(200).json(doctors);
   } catch (err) {
@@ -459,6 +507,7 @@ exports.getProductsOfDoctor = async (req, res) => {
       where: { SID: storeSID },
       attributes: [],
       include: [Product],
+      order: [["createdAt", "DESC"]],
     });
     res.status(200).json(products);
   } catch (err) {
@@ -478,6 +527,7 @@ exports.getProductsOfStore = async (req, res) => {
       where: { SID: id },
       attributes: [],
       include: [Product],
+      order: [["createdAt", "DESC"]],
       limit,
       offset,
     });
@@ -547,10 +597,16 @@ exports.getOrders = async (req, res) => {
   try {
     const SID = req.userId;
 
-    const { addressType = "", orderType = "" } = req.body; 
+    const { addressType = "", orderType = "" } = req.body;
 
     const validAddressTypes = ["isClinic", "isCollect", "isAddress"];
-    const validOrderTypes = ["isPacked", "isDispatched", "isDelivered", "isCancelled", "new"];
+    const validOrderTypes = [
+      "isPacked",
+      "isDispatched",
+      "isDelivered",
+      "isCancelled",
+      "new",
+    ];
 
     let whereConditions = {
       SID,
@@ -570,17 +626,17 @@ exports.getOrders = async (req, res) => {
       }
 
       if (orderType === "new") {
-        order = [["createdAt", "DESC"]]; 
+        order = [["createdAt", "DESC"]];
         limit = 10;
         if (addressType.length > 0) {
-          whereConditions[addressType] = true; 
+          whereConditions[addressType] = true;
         }
       } else {
         if (addressType.length > 0) {
-          whereConditions[addressType] = true; 
+          whereConditions[addressType] = true;
         }
         if (orderType.length > 0) {
-          whereConditions[orderType] = true; 
+          whereConditions[orderType] = true;
         }
       }
     }
@@ -609,9 +665,9 @@ exports.getOrders = async (req, res) => {
           ],
         },
       ],
+      order: [["createdAt", "DESC"]],
       limit,
       offset,
-      order, 
     });
 
     res.status(200).json({
@@ -624,4 +680,4 @@ exports.getOrders = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-}
+};

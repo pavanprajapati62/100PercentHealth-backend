@@ -9,7 +9,6 @@ exports.createProduct = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const {
-      productId,
       productName,
       manufacturer,
       units,
@@ -19,14 +18,6 @@ exports.createProduct = async (req, res) => {
       marginPercentage,
       pricing,
     } = req.body;
-
-    const existingProduct = await Product.findOne({
-      where: { IID: productId },
-    });
-
-    if (existingProduct) {
-      return res.status(404).json({ error: "Product id already exist" });
-    }
 
     const uniqueStoreIds = [...new Set(storeQty.map((store) => store.storeId))];
 
@@ -50,7 +41,6 @@ exports.createProduct = async (req, res) => {
 
     const product = await Product.create(
       {
-        IID: productId,
         productName,
         manufacturer,
         units,
@@ -58,6 +48,7 @@ exports.createProduct = async (req, res) => {
         drugs,
         storeQty,
         pricing,
+        productStock: units,
       },
       { transaction }
     );
@@ -70,6 +61,8 @@ exports.createProduct = async (req, res) => {
     const storeProductEntries = storeQty.map((store) => ({
       IID: product.IID,
       SID: store.storeId,
+      productName: product.productName,
+      storeStock: store.Qty,
     }));
     await StoreProduct.bulkCreate(storeProductEntries, { transaction });
 
@@ -91,6 +84,7 @@ exports.getAllProducts = async (req, res) => {
 
     const { count, rows: products } = await Product.findAndCountAll({
       include: [{ model: ProductMargin }],
+      order: [["createdAt", "DESC"]],
       limit,
       offset,
     });
@@ -125,7 +119,7 @@ exports.getProductById = async (req, res) => {
 
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
-  const { updatedData, marginPercentage } = req.body;
+  const { marginPercentage, units, ...updatedData } = req.body;
 
   try {
     const product = await Product.findOne({
@@ -136,13 +130,19 @@ exports.updateProduct = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
+    if (units) {
+      const newProductStock = units;
+      updatedData.units = newProductStock;
+      updatedData.productStock = newProductStock;
+    }
+
     await product.update(updatedData);
 
     if (marginPercentage) {
       const [productMargin, created] = await ProductMargin.findOrCreate({
-        where: { IID: id }, 
+        where: { IID: id },
         defaults: {
-          ...marginPercentage, 
+          ...marginPercentage,
           IID: id,
         },
       });
@@ -184,6 +184,7 @@ exports.searchProduct = async (req, res) => {
         [Op.or]: [{ productName: { [Op.iLike]: `%${searchQuery}%` } }],
       },
       include: [{ model: ProductMargin }],
+      order: [["createdAt", "DESC"]],
     });
 
     res.status(200).json(products || []);
@@ -204,6 +205,7 @@ exports.searchDrug = async (req, res) => {
           WHERE drug ILIKE '%${searchQuery}%'
         )
       `),
+      order: [["createdAt", "DESC"]],
     });
 
     const filteredProducts = products.map((product) => {

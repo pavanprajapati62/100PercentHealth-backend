@@ -14,6 +14,7 @@ const PatientAddress = require("../models/Order/Adress");
 const Product = require("../models/Product/Product");
 const FrequentProducts = require("../models/Doctor/FrequentProducts");
 const Address = require("../models/Store/Address");
+const jwt = require("jsonwebtoken");
 
 exports.createDoctor = async (req, res) => {
   try {
@@ -48,9 +49,12 @@ exports.createDoctor = async (req, res) => {
       .json({ message: "Doctor and related details created successfully." });
   } catch (err) {
     console.error("Error creating doctor:", err);
+    // res
+    //   .status(500)
+    //   .json({ error: "Failed to create doctor and related details." });
     res
       .status(500)
-      .json({ error: "Failed to create doctor and related details." });
+      .json({ error: err });
   }
 };
 
@@ -67,6 +71,7 @@ exports.getAllDoctors = async (req, res) => {
         PaymentDetails,
         Order,
       ],
+      order: [["createdAt", "DESC"]], 
     });
     res.status(200).json(doctors);
   } catch (error) {
@@ -176,6 +181,7 @@ exports.searchDoctor = async (req, res) => {
           model: ClinicAddress,
         },
       ],
+      order: [["createdAt", "DESC"]],
     });
 
     res.status(200).json(doctors || []);
@@ -207,6 +213,16 @@ exports.getAllPatients = async (req, res) => {
   }
 };
 
+function decryptPin(token) {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return decoded.pin;
+  } catch (err) {
+    console.error('Invalid token:', err.message);
+    return null; 
+  }
+}
+
 exports.getDoctorDetail = async (req, res) => {
   const DID = req.userId;
   try {
@@ -218,7 +234,17 @@ exports.getDoctorDetail = async (req, res) => {
     if (!doctor) {
       return res.status(404).json({ message: "Doctor not found" });
     }
-    res.status(200).json(doctor);
+
+    // const decryptedPin = decryptPin(doctor.pin);
+    // const decryptedPinB = decryptPin(doctor.pinB);
+
+    const lastOrder = await Order.findOne({
+      where: { DID: DID },
+      order: [["createdAt", "DESC"]], 
+      limit: 1, 
+    });
+
+    res.status(200).json({doctor, lastOrder});
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -247,6 +273,7 @@ exports.getBillingDetails = async (req, res) => {
     const storeBillingDetail = await StoreBillingDetail.findOne({
       where: { SID: store.SID },
       include: [{ model: Store, include: [{ model: Address }] }],
+      order: [["createdAt", "DESC"]],
     });
     res.status(200).json(storeBillingDetail);
   } catch (err) {
@@ -317,7 +344,8 @@ exports.addProductsToFrequent = async (req, res) => {
 
 exports.getFrequentProducts = async (req, res) => {
   try {
-    const id = req.userId;
+    // const id = req.userId;
+    const id = req.params.id;
 
     if (id.startsWith("DID")) {
       const doctor = await Doctor.findOne({ where: { DID: id } });
@@ -328,11 +356,13 @@ exports.getFrequentProducts = async (req, res) => {
       var frequentProducts = await FrequentProducts.findAll({
         where: { DID: id },
         include: [{ model: Product }],
+        order: [["createdAt", "DESC"]], 
       });
     } else {
       var frequentProducts = await FrequentProducts.findAll({
         where: { SID: id },
         include: [{ model: Product }],
+        order: [["createdAt", "DESC"]], 
       });
     }
 

@@ -12,12 +12,17 @@ const StoreBillingDetail = sequelize.define('storeBillingDetail', {
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   },
+  applyAll: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
   smallCartFee: {
     type: DataTypes.JSON, 
     allowNull: true,
     defaultValue: {
       charges: "",
       applyBelow: "",
+      enable: false,
     }
   },
   handlingFee: {
@@ -25,6 +30,7 @@ const StoreBillingDetail = sequelize.define('storeBillingDetail', {
     defaultValue: {
       charges: "",
       applyBelow: "",
+      enable: false,
     }
   },
   deliveryChargesSameState: {
@@ -33,6 +39,7 @@ const StoreBillingDetail = sequelize.define('storeBillingDetail', {
     defaultValue: {
       charges: "",
       applyBelow: "",
+      enable: false,
     }
   },
   deliveryChargesOtherState: {
@@ -41,6 +48,7 @@ const StoreBillingDetail = sequelize.define('storeBillingDetail', {
     defaultValue: {
       charges: "",
       applyBelow: "",
+      enable: false,
     }
   },
   noDiscount: {
@@ -49,6 +57,7 @@ const StoreBillingDetail = sequelize.define('storeBillingDetail', {
     defaultValue: {
       percentage: "",
       applyBelow: "",
+      enable: false,
     }
   },
   isDiscount: {
