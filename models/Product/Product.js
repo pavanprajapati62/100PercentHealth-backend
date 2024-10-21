@@ -52,7 +52,19 @@ const Product = sequelize.define("product", {
       discount: 0,
     },
   },
+  productStock: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  }
 });
+
+Product.beforeCreate(async (product) => {
+  const productCount = await Product.count();
+  const newIID = `IID${String(productCount + 1).padStart(3, "0")}`;
+
+  product.IID = newIID;
+});
+
 
 Product.hasOne(ProductMargin, { foreignKey: "IID", sourceKey: "IID" });
 ProductMargin.belongsTo(Product, { foreignKey: "IID", targetKey: "IID" });

@@ -26,11 +26,11 @@ const Invoice = sequelize.define("invoice", {
   },
 });
 
-Invoice.beforeCreate(async (invoice) => {
-  const invoiceCount = await Invoice.count();
-  const newIVID = `IVID${String(invoiceCount + 1).padStart(3, "0")}`;
+// Invoice.beforeCreate(async (invoice) => {
+//   const invoiceCount = await Invoice.count();
+//   const newIVID = `IVID${String(invoiceCount + 1).padStart(3, "0")}`;
 
-  invoice.IVID = newIVID;
-});
+//   invoice.invoiceNo = newIVID;
+// });
 
 module.exports = Invoice;

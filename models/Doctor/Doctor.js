@@ -11,6 +11,8 @@ const Store = require("../Store/Store");
 const PatientDetails = require("../Order/PatientDetails");
 const Order = require("../Order/Order");
 const FrequentProducts = require("./FrequentProducts");
+const DoctorOrderMargins = require("./DoctorOrderMargins");
+const DoctorRent = require("../Rent/DoctorRent");
 
 const Doctor = sequelize.define("doctor", {
   DID: {
@@ -92,5 +94,11 @@ Order.belongsTo(Doctor, { foreignKey: "DID", targetKey: "DID" });
 
 Doctor.hasMany(FrequentProducts, { foreignKey: "DID", sourceKey: "DID" });
 FrequentProducts.belongsTo(Doctor, { foreignKey: "DID", targetKey: "DID" });
+
+Doctor.hasMany(DoctorOrderMargins, { foreignKey: "DID", sourceKey: "DID" });
+DoctorOrderMargins.belongsTo(Doctor, { foreignKey: "DID", targetKey: "DID" });
+
+Doctor.hasMany(DoctorRent, { foreignKey: "DID", sourceKey: "DID" });
+DoctorRent.belongsTo(Doctor, { foreignKey: "DID", targetKey: "DID" });
 
 module.exports = Doctor;

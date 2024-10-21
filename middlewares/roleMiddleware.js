@@ -73,4 +73,12 @@ const isStoreOrDoctor = (req, res, next) => {
   }
 };
 
-module.exports = { verifyToken, isAdmin, isDoctor, isStore, isAdminOrDoctor, isStoreOrAdmin, isStoreOrDoctor };
+const iAdminOrStoreOrDoctor = (req, res, next) => {
+  if (req.userRole === "admin" || req.userRole === "store" || req.userRole === "doctor") {
+    next();
+  } else {
+    res.status(403).send({ message: "Require Store Or Doctor Role!" });
+  }
+};
+
+module.exports = { verifyToken, isAdmin, isDoctor, isStore, isAdminOrDoctor, isStoreOrAdmin, isStoreOrDoctor, iAdminOrStoreOrDoctor };

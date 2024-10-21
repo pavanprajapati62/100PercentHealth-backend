@@ -18,6 +18,14 @@ const StoreProduct = sequelize.define("storeProduct", {
     },
     allowNull: false,
   },
+  productName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  storeStock: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  }
 });
 
 module.exports = StoreProduct;

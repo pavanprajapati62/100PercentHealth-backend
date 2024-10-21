@@ -10,6 +10,22 @@ const OrderProduct = sequelize.define("orderProduct", {
     },
     allowNull: false,
   },
+  IID: {
+    type: DataTypes.STRING,
+    references: {
+      model: "products",
+      key: "IID",
+    },
+    allowNull: true,
+  },
+  SID: {
+    type: DataTypes.STRING,
+    references: {
+      model: "stores",
+      key: "SID",
+    },
+    allowNull: true,
+  },
   productName: {
     type: DataTypes.STRING,
     allowNull: true,

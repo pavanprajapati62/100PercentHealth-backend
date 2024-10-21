@@ -81,6 +81,10 @@ const Order = sequelize.define("order", {
     },
     allowNull: false,
   },
+  filePath: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 });
 
 Order.beforeCreate(async (order) => {
