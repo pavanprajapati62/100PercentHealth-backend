@@ -1,4 +1,5 @@
 const { Op } = require("sequelize");
+const jwt = require("jsonwebtoken");
 const Doctor = require("../models/Doctor/Doctor");
 const Order = require("../models/Order/Order");
 const Address = require("../models/Store/Address");
@@ -20,6 +21,7 @@ const Billing = require("../models/Order/Billing");
 const OrderProduct = require("../models/Order/Product");
 const PatientAddress = require("../models/Order/Adress");
 const DoctorOrderMargins = require("../models/Doctor/DoctorOrderMargins");
+const Invoice = require("../models/Order/Invoice");
 
 exports.createStore = async (req, res) => {
   try {
@@ -81,8 +83,18 @@ exports.getStoreById = async (req, res) => {
     if (!store) {
       return res.status(404).json({ message: "Store not found" });
     }
+    const storeData = store?.get({ plain: true });
 
-    res.status(200).json(store);
+    let plainPin;
+    try {
+      const decoded = jwt.verify(store.pin, process.env.JWT_SECRET);
+      plainPin = decoded.pin;
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+    storeData.pin = plainPin;
+
+    res.status(200).json(storeData);
   } catch (error) {
     console.error("Error getting store by ID:", error);
     res.status(500).json({ error: error.message });
@@ -99,6 +111,10 @@ exports.updateStore = async (req, res) => {
       where: { SID },
     });
     if (!store) return res.status(404).json({ error: "Store not found" });
+    if(storeDetails.pin) {
+      const token = jwt.sign({ pin: storeDetails.pin }, process.env.JWT_SECRET);
+      storeDetails.pin = token;
+    }
 
     await store.update(storeDetails);
     await Compliances.update(compliances, { where: { SID } });
@@ -525,7 +541,7 @@ exports.getProductsOfStore = async (req, res) => {
 
     const { rows: products, count } = await StoreProduct.findAndCountAll({
       where: { SID: id },
-      attributes: [],
+      attributes: ['productName', 'storeStock', 'units'],
       include: [Product],
       order: [["createdAt", "DESC"]],
       limit,
@@ -651,6 +667,7 @@ exports.getOrders = async (req, res) => {
         Billing,
         PatientAddress,
         OrderProduct,
+        Invoice,
         {
           model: Doctor,
           attributes: ["DID", "contactNumber", "role"],
@@ -681,3 +698,32 @@ exports.getOrders = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.getOrdersWithoutCancel = async (req, res) => {
+  // try {
+  //   const SID = req.userId;
+
+  //   const { addressType = "" } = req.body;
+
+  //   const validAddressTypes = ["isClinic", "isCollect", "isAddress"];
+
+  //   let whereConditions = {
+  //     SID,
+  //     isCancelled: false,
+  //   };
+
+  //   if (addressType.length === 0) {
+  //     whereConditions = { SID, isCancelled: false };
+  //   } else {
+  //     if (addressType.length > 0 &&!validAddressTypes.includes(addressType)) {
+  //       return res.status(400).json({ error: "Invalid address type" });
+  //     }
+  //     whereConditions[addressType] = true;
+  //   }
+
+  //   const page = parseInt(req.query.page) || 1;
+  //   const limit = parseInt(req.query.limit) || 10;
+  //   const offset = (page - 1) * limit;
+
+  //   const { count, rows: orders } = await St
+}

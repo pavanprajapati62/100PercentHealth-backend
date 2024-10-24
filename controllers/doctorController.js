@@ -15,6 +15,8 @@ const Product = require("../models/Product/Product");
 const FrequentProducts = require("../models/Doctor/FrequentProducts");
 const Address = require("../models/Store/Address");
 const jwt = require("jsonwebtoken");
+const Billing = require("../models/Order/Billing");
+const OrderProduct = require("../models/Order/Product");
 
 exports.createDoctor = async (req, res) => {
   try {
@@ -121,6 +123,35 @@ exports.updateDoctor = async (req, res) => {
       where: { DID },
     });
     if (!doctor) return res.status(404).json({ error: "Doctor not found" });
+
+    // if(doctorDetails.pin) {
+    //   if(doctor.pin) {
+
+    //     var decodedPin = jwt.sign(doctor.pin, process.env.JWT_SECRET);
+    //   }
+    //   if(doctor.pinB) {
+    //     var decodedPinB = jwt.verify(doctor.pinB, process.env.JWT_SECRET);
+    //   }
+  
+    //   // let isMatchPin = await bcrypt.compare(pin, doctor.pin);
+  
+    //   // let isMatchPinB = await bcrypt.compare(pin, doctor.pinB);
+  
+    //   let isMatchPinB = false;
+    //   if (decodedPinB?.pin === pin) {
+    //     isMatchPinB = true
+    //     doctor.is_pin_b = true;
+    //     await doctor.save();
+    //   }
+  
+    //   let isMatchPin = false;
+    //   if (decodedPin?.pin === pin && !isMatchPinB) {
+    //     isMatchPin = true;
+    //     doctor.is_pin_b = false;
+    //     await doctor.save();
+    //   }
+    // }
+    // const token = jwt.sign({ pin: storeDetails.pin }, process.env.JWT_SECRET);
 
     await doctor.update(doctorDetails);
     await Compliances.update(compliances, { where: { DID } });
@@ -320,7 +351,7 @@ exports.addProductsToFrequent = async (req, res) => {
     }
 
     const existingFrequentProduct = await FrequentProducts.findOne({
-      where: { IID: IID },
+      where: { IID: IID, DID: DID },
     });
     if (!existingFrequentProduct) {
       await FrequentProducts.create({
@@ -383,5 +414,63 @@ exports.removeFrequentProduct = async (req, res) => {
     res.status(200).json({ message: "Frequent product deleted successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getAllOrdersOfDoctor = async (req, res) => {
+  try {
+    const DID = req.userId;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    const offset = (page - 1) * limit;
+
+    const filter = req.query?.filter || "all";
+
+    let whereClause = {
+      DID
+    };
+    if (filter === "isClinic") {
+      whereClause.isClinic = true;
+    } else if (filter === "isCollect") {
+      whereClause.isCollect = true;
+    } else if (filter === "isAddress") {
+      whereClause.isAddress = true;
+    }
+
+    const { count, rows: orders } = await Order.findAndCountAll({
+      where: whereClause,
+      include: [
+        PatientDetails,
+        Billing,
+        PatientAddress,
+        OrderProduct,
+        {
+          model: Doctor,
+          attributes: ["DID", "contactNumber", "role"],
+          include: [
+            {
+              model: PersonalInfo,
+            },
+            {
+              model: ClinicAddress,
+              attributes: ["premisesName", "clinicContactNumber"],
+            },
+          ],
+        },
+      ],
+      limit,
+      offset,
+      order: [["createdAt", "DESC"]],
+    });
+    res.status(200).json({
+      currentPage: page,
+      limit,
+      totalItems: count,
+      totalPages: Math.ceil(count / limit),
+      orders,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };

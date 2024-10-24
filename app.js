@@ -7,7 +7,9 @@ const doctorRoutes = require("./routes/doctorRoutes");
 const storeRoutes = require("./routes/storeRoutes");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoute");
+const rentRoutes = require("./routes/rentRoute");
 const db = require("./config/db");
+require("./services/rentCron")
 
 const app = express();
 
@@ -24,7 +26,7 @@ app.use("/api/doctor", doctorRoutes);
 app.use("/api/store", storeRoutes);
 app.use("/api/product", productRoutes);
 app.use("/api/order", orderRoutes)
-// app.use("/api/admin", adminRoutes);
+app.use("/api/rent", rentRoutes)
 
 const PORT = process.env.PORT || 5000;
 

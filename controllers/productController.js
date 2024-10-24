@@ -17,6 +17,7 @@ exports.createProduct = async (req, res) => {
       storeQty,
       marginPercentage,
       pricing,
+      uom
     } = req.body;
 
     const uniqueStoreIds = [...new Set(storeQty.map((store) => store.storeId))];
@@ -49,6 +50,7 @@ exports.createProduct = async (req, res) => {
         storeQty,
         pricing,
         productStock: units,
+        uom,
       },
       { transaction }
     );
@@ -63,8 +65,17 @@ exports.createProduct = async (req, res) => {
       SID: store.storeId,
       productName: product.productName,
       storeStock: store.Qty,
+      units: product.uom,
     }));
     await StoreProduct.bulkCreate(storeProductEntries, { transaction });
+
+    const totalStoreQty = storeQty.reduce((total, store) => total + parseInt(store.Qty, 10), 0);
+    const updatedProductStock = product.productStock - totalStoreQty;
+
+    await Product.update(
+      { productStock: updatedProductStock },
+      { where: { IID: product.IID }, transaction }
+    );
 
     await transaction.commit();
 

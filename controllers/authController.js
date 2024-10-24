@@ -64,16 +64,28 @@ exports.doctorLogin = async (req, res) => {
       return res.status(404).json({ message: "Doctor not found" });
     }
 
-    let isMatchPin = await bcrypt.compare(pin, doctor.pin);
+    if(doctor.pin) {
 
-    let isMatchPinB = await bcrypt.compare(pin, doctor.pinB);
+      var decodedPin = jwt.verify(doctor.pin, process.env.JWT_SECRET);
+    }
+    if(doctor.pinB) {
+      var decodedPinB = jwt.verify(doctor.pinB, process.env.JWT_SECRET);
+    }
 
-    if (isMatchPinB) {
+    // let isMatchPin = await bcrypt.compare(pin, doctor.pin);
+
+    // let isMatchPinB = await bcrypt.compare(pin, doctor.pinB);
+
+    let isMatchPinB = false;
+    if (decodedPinB?.pin === pin) {
+      isMatchPinB = true
       doctor.is_pin_b = true;
       await doctor.save();
     }
 
-    if (isMatchPin && !isMatchPinB) {
+    let isMatchPin = false;
+    if (decodedPin?.pin === pin && !isMatchPinB) {
+      isMatchPin = true;
       doctor.is_pin_b = false;
       await doctor.save();
     }
@@ -114,7 +126,12 @@ exports.storeLogin = async (req, res) => {
       return res.status(404).json({ message: "Store not found" });
     }
 
-    const isMatch = await bcrypt.compare(pin, store.pin);
+    // const isMatch = await bcrypt.compare(pin, store.pin);
+    let isMatch = false;
+    const decodedPin = jwt.verify(store.pin, process.env.JWT_SECRET);
+    if (decodedPin.pin === pin) {
+      isMatch = true;
+    }
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid PIN" });
     }

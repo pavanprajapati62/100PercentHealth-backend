@@ -25,7 +25,11 @@ const StoreProduct = sequelize.define("storeProduct", {
   storeStock: {
     type: DataTypes.INTEGER,
     allowNull: true,
-  }
+  },
+  units: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 });
 
 module.exports = StoreProduct;

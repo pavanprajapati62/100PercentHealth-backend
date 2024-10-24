@@ -13,6 +13,7 @@ const Order = require("../Order/Order");
 const FrequentProducts = require("./FrequentProducts");
 const DoctorOrderMargins = require("./DoctorOrderMargins");
 const DoctorRent = require("../Rent/DoctorRent");
+const jwt = require("jsonwebtoken");
 
 const Doctor = sequelize.define("doctor", {
   DID: {
@@ -57,12 +58,31 @@ const Doctor = sequelize.define("doctor", {
 
 // Before creating a doctor, generate a unique DID and hash the pin
 Doctor.beforeCreate(async (doctor) => {
-  const doctorCount = await Doctor.count();
-  const newDID = `DID${String(doctorCount + 1).padStart(3, "0")}`;
+  // const doctorCount = await Doctor.count();
+  // const newDID = `DID${String(doctorCount + 1).padStart(3, "0")}`;
+  const lastDoctor = await Doctor.findOne({
+    order: [['DID', 'DESC']],
+    attributes: ['DID'],
+  });
+  console.log("lastDoctor=====================", lastDoctor)
+
+  let newDID;
+
+  if (lastDoctor && lastDoctor.DID) {
+    const lastDIDNumber = parseInt(lastDoctor.DID.slice(3), 10);
+    console.log("lastDIDNumber==============",lastDIDNumber)
+    newDID = `DID${String(lastDIDNumber + 1).padStart(3, '0')}`;
+    console.log("newDID in if", newDID)
+  } else {
+    // First time creation, start with DID001
+    newDID = 'DID001';
+  }
 
   // Hash the PIN before saving
-  const hashedPin = await bcrypt.hash(doctor.pin, 10);
-  const hashedPinB = await bcrypt.hash(doctor.pinB, 10);
+  // const hashedPin = await bcrypt.hash(doctor.pin, 10);
+  // const hashedPinB = await bcrypt.hash(doctor.pinB, 10);
+  const hashedPin = jwt.sign({ pin: doctor.pin }, process.env.JWT_SECRET);
+  const hashedPinB = jwt.sign({ pin: doctor.pin }, process.env.JWT_SECRET);
   doctor.pin = hashedPin;
   doctor.pinB = hashedPinB;
 
