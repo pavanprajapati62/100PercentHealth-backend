@@ -30,7 +30,7 @@ const Product = sequelize.define("product", {
       "Drops",
       "Powder",
       "Cream",
-      "Oinment",
+      "Ointment",
       "Other"
     ),
     allowNull: false,
@@ -55,12 +55,31 @@ const Product = sequelize.define("product", {
   productStock: {
     type: DataTypes.INTEGER,
     allowNull: true
-  }
+  },
+  uom: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 });
 
 Product.beforeCreate(async (product) => {
-  const productCount = await Product.count();
-  const newIID = `IID${String(productCount + 1).padStart(3, "0")}`;
+  // const productCount = await Product.count();
+  // const newIID = `IID${String(productCount + 1).padStart(3, "0")}`;
+
+  const lastproduct = await Product.findOne({
+    order: [['IID', 'DESC']],
+    attributes: ['IID'],
+  });
+
+  let newIID;
+
+  if (lastproduct && lastproduct.IID) {
+    const lastOIDNumber = parseInt(lastproduct.IID.slice(3), 10);
+    newIID = `IID${String(lastOIDNumber + 1).padStart(3, '0')}`;
+  } else {
+    // First time creation, start with SID001
+    newIID = 'IID001';
+  }
 
   product.IID = newIID;
 });

@@ -53,6 +53,20 @@ exports.createOrder = async (req, res) => {
       return res.status(404).json({ message: "Store not found" });
     }
 
+    // for(let i = 0; i < products.length; i++) {
+    //   const { orderUnits, productName } = products[i];
+    //   const storeProduct = await StoreProduct.findOne({
+    //     where: { SID: store.SID, productName: productName },
+    //   });
+    //   const storeProductData = storeProduct?.get({ plain: true });
+
+    //   if (storeProductData?.storeStock < orderUnits) {
+    //     return res.status(404).json({
+    //       message: `Store ${SID} stock is less than the required units`,
+    //     });
+    //   }
+    // }
+
     const order = await Order.create(
       {
         payment,
@@ -110,7 +124,7 @@ exports.createOrder = async (req, res) => {
       .json({ message: "Order and related details created successfully." });
   } catch (err) {
     await transaction.rollback();
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err });
   }
 };
 
@@ -119,6 +133,7 @@ exports.uploadImage = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
+    console.log("req.file.path===========",req.file.path)
 
     const filePath = req.file.path;
 
@@ -294,7 +309,7 @@ const getDoctorMargin = async (orderId, doctorId, orderProducts) => {
     
     let totalMarginPercentage = 0;
     for(let i = 0; i < orderProducts.length; i++) {
-      const { IID, mrp, gst } = orderProducts[i];
+      const { IID, mrp } = orderProducts[i];
       const product = await Product.findOne({
         where: { IID: IID },
         include: [{ model: ProductMargin }],
@@ -305,12 +320,7 @@ const getDoctorMargin = async (orderId, doctorId, orderProducts) => {
       const categoryPercentage = productData?.productMargin[doctorCategory];
 
       if (categoryPercentage !== undefined) {
-        // const margin = getMargin(productData?.pricing?.mrp, categoryPercentage);
-        // const margin = getMargin(mrp, categoryPercentage);
-        let mrpCalculation = (mrp * gst) / 100;
-        mrpCalculation = Math.floor(mrpCalculation);
-        let mrpExuldingGst = mrp - mrpCalculation;
-        const margin = getMargin(mrpExuldingGst, categoryPercentage);
+        const margin = getMargin(mrp, categoryPercentage);
         totalMarginPercentage += margin;
       }
     }
@@ -346,28 +356,15 @@ exports.updateOrderStatus = async (req, res) => {
     let invoiceData = null;
 
     if (isAccepted) {
-      // for(let i = 0; i < orderData?.orderProducts.length; i++) {
-      //   const { IID, orderUnits } = orderData?.orderProducts[i];
-      //   const product = await Product.findOne({
-      //     where: { IID: IID },
-      //   });
-      //   const productData = product?.get({ plain: true });
-
-      //   if (productData?.productStock < orderUnits) {
-      //     return res.status(404).json({
-      //       message: `Product ${IID} stock is less than the required units`,
-      //     });
-      //   }
-      // }
 
       for(let i = 0; i < orderData.orderProducts.length; i++) {
-        const { IID, orderUnits, SID, productName } = orderData.orderProducts[i];
+        const { IID, orderUnits, SID, productName, orderQty } = orderData.orderProducts[i];
         const storeProduct = await StoreProduct.findOne({
           where: { IID: IID, SID: SID, productName: productName },
         });
         const storeProductData = storeProduct?.get({ plain: true });
 
-        if (storeProductData?.storeStock < orderUnits) {
+        if (storeProductData?.storeStock < orderQty) {
           return res.status(404).json({
             message: `Store ${SID} stock is less than the required units`,
           });
@@ -377,31 +374,15 @@ exports.updateOrderStatus = async (req, res) => {
       try {
         await sequelize.transaction(async (t) => {
           for (let i = 0; i < orderData?.orderProducts.length; i++) {
-            const { IID, orderUnits } = orderData?.orderProducts[i];
-    
-            const product = await Product.findOne({ where: { IID }, transaction: t });
-            const newStock = product.productStock - orderUnits;
-    
-            await product.update({ productStock: newStock }, { transaction: t });
-          }
-        });
-      } catch (error) {
-        return res.status(500).json({ message: "An error occurred while processing the order" });
-      }
-
-      try {
-        await sequelize.transaction(async (t) => {
-          for (let i = 0; i < orderData?.orderProducts.length; i++) {
-            const { IID, orderUnits, SID, productName } = orderData?.orderProducts[i];
-    
+            const { IID, orderUnits, SID, productName, orderQty } = orderData?.orderProducts[i];
             const storeProduct = await StoreProduct.findOne({ where: { IID: IID, SID: SID, productName: productName }, transaction: t });
-            const newStock = storeProduct.storeStock - orderUnits;
+            const newStock = storeProduct.storeStock - orderQty;
     
             await storeProduct.update({ storeStock: newStock }, { transaction: t });
           }
         });
       } catch (error) {
-        return res.status(500).json({ message: "An error occurred while processing the order" });
+        return res.status(500).json({ message: error });
       }
 
       order.isAccepted = true;
@@ -411,8 +392,23 @@ exports.updateOrderStatus = async (req, res) => {
         where: { OID: OID },
       });
 
-      const invoiceCount = await Invoice.count();
-      const newIVID = `IVID${String(invoiceCount + 1).padStart(3, "0")}`;
+      // const invoiceCount = await Invoice.count();
+      // const newIVID = `IVID${String(invoiceCount + 1).padStart(3, "0")}`;
+
+      const lastInvoice = await Invoice.findOne({
+        order: [['IVID', 'DESC']],
+        attributes: ['IVID'],
+      });
+    
+      let newIVID;
+    
+      if (lastInvoice && lastInvoice.IVID) {
+        const lastIVIDNumber = parseInt(lastInvoice.IVID.slice(4), 10);
+        newIVID = `IVID${String(lastIVIDNumber + 1).padStart(3, '0')}`;
+      } else {
+        // First time creation, start with IVID001
+        newIVID = 'IVID001';
+      }
 
       invoiceData = await Invoice.create({
         IVID: newIVID,
@@ -420,7 +416,7 @@ exports.updateOrderStatus = async (req, res) => {
         invoiceNo: newIVID,
         invoiceAmount: payableAmount,
       });
-
+  
       var doctorMargin = await getDoctorMargin(
         orderData.OID,
         orderData.DID,

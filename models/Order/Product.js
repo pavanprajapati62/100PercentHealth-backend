@@ -30,6 +30,10 @@ const OrderProduct = sequelize.define("orderProduct", {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  units: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   rxDays: {
     type: DataTypes.STRING,
     allowNull: true,

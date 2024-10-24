@@ -14,6 +14,7 @@ const {
   addProductsToFrequent,
   getFrequentProducts,
   removeFrequentProduct,
+  getAllOrdersOfDoctor,
 } = require("../controllers/doctorController");
 const {
   verifyToken,
@@ -28,6 +29,7 @@ router.post("/", [verifyToken, isAdmin], createDoctor);
 router.get("/", [verifyToken, isAdmin], getAllDoctors);
 router.get("/get-all-patients", [verifyToken, isDoctor], getAllPatients);
 router.get("/get-doctor-detail", [verifyToken, isDoctor], getDoctorDetail);
+router.get('/get-orders-doctor', [verifyToken, isDoctor], getAllOrdersOfDoctor)
 router.get("/search-doctor", searchDoctor);
 router.get("/get-billing-detail", [verifyToken, isStoreOrDoctor], getBillingDetails);
 router.get("/get-products-frequent/:id", [verifyToken, iAdminOrStoreOrDoctor], getFrequentProducts)

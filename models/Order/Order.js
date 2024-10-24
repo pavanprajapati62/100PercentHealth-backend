@@ -88,8 +88,22 @@ const Order = sequelize.define("order", {
 });
 
 Order.beforeCreate(async (order) => {
-  const orderCount = await Order.count();
-  const newOID = `OID${String(orderCount + 1).padStart(3, "0")}`;
+  // const orderCount = await Order.count();
+  // const newOID = `OID${String(orderCount + 1).padStart(3, "0")}`;
+  const lastOrder = await Order.findOne({
+    order: [['OID', 'DESC']],
+    attributes: ['OID'],
+  });
+
+  let newOID;
+
+  if (lastOrder && lastOrder.OID) {
+    const lastOIDNumber = parseInt(lastOrder.OID.slice(3), 10);
+    newOID = `OID${String(lastOIDNumber + 1).padStart(3, '0')}`;
+  } else {
+    // First time creation, start with SID001
+    newOID = 'OID001';
+  }
 
   order.OID = newOID;
 });

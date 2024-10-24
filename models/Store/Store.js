@@ -8,6 +8,7 @@ const bcrypt = require("bcryptjs");
 const Order = require("../Order/Order");
 const StoreBillingDetail = require("./StoreBillingDetail");
 const FrequentProducts = require("../Doctor/FrequentProducts");
+const jwt = require("jsonwebtoken");
 
 const Store = sequelize.define("store", {
   SID: {
@@ -40,10 +41,25 @@ const Store = sequelize.define("store", {
 });
 
 Store.beforeCreate(async (store) => {
-  const storeCount = await Store.count();
-  const newSID = `SID${String(storeCount + 1).padStart(3, "0")}`;
+  // const storeCount = await Store.count();
+  // const newSID = `SID${String(storeCount + 1).padStart(3, "0")}`;
 
-  const hashedPin = await bcrypt.hash(store.pin, 10);
+  const lastStore = await Store.findOne({
+    order: [['SID', 'DESC']],
+    attributes: ['SID'],
+  });
+
+  let newSID;
+
+  if (lastStore && lastStore.SID) {
+    const lastSIDNumber = parseInt(lastStore.SID.slice(3), 10);
+    newSID = `SID${String(lastSIDNumber + 1).padStart(3, '0')}`;
+  } else {
+    // First time creation, start with SID001
+    newSID = 'SID001';
+  }
+
+  const hashedPin = jwt.sign({ pin: store.pin }, process.env.JWT_SECRET);
   store.pin = hashedPin;
 
   store.SID = newSID;
