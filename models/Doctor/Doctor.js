@@ -31,7 +31,7 @@ const Doctor = sequelize.define("doctor", {
   },
   pinB: {
     type: DataTypes.STRING,
-    allowNull: true,
+    allowNull: false,
   },
   role: {
     type: DataTypes.STRING,
@@ -64,25 +64,19 @@ Doctor.beforeCreate(async (doctor) => {
     order: [['DID', 'DESC']],
     attributes: ['DID'],
   });
-  console.log("lastDoctor=====================", lastDoctor)
 
   let newDID;
 
   if (lastDoctor && lastDoctor.DID) {
     const lastDIDNumber = parseInt(lastDoctor.DID.slice(3), 10);
-    console.log("lastDIDNumber==============",lastDIDNumber)
     newDID = `DID${String(lastDIDNumber + 1).padStart(3, '0')}`;
-    console.log("newDID in if", newDID)
   } else {
     // First time creation, start with DID001
     newDID = 'DID001';
   }
 
-  // Hash the PIN before saving
-  // const hashedPin = await bcrypt.hash(doctor.pin, 10);
-  // const hashedPinB = await bcrypt.hash(doctor.pinB, 10);
   const hashedPin = jwt.sign({ pin: doctor.pin }, process.env.JWT_SECRET);
-  const hashedPinB = jwt.sign({ pin: doctor.pin }, process.env.JWT_SECRET);
+  const hashedPinB = jwt.sign({ pinB: doctor.pinB }, process.env.JWT_SECRET);
   doctor.pin = hashedPin;
   doctor.pinB = hashedPinB;
 

@@ -142,18 +142,18 @@ async function getOrdersOfDoctor(req, res) {
 
     const startDate = new Date(year, monthNumber - 1, 1, 0, 0, 0, 0); 
 
-// Last day of the month at 23:59:59 (Local Time)
-const endDate = new Date(year, monthNumber, 0, 23, 59, 59, 999);
+    // Last day of the month at 23:59:59 (Local Time)
+    const endDate = new Date(year, monthNumber, 0, 23, 59, 59, 999);
     console.log("startDate=========================",startDate);
     console.log("endDate=========================",endDate)
 
-    const condition = {
-      DID: DID,
-      [Op.and]: [
-        Sequelize.fn('EXTRACT', 'MONTH', Sequelize.col('createdAt')) == monthNumber,
-        Sequelize.fn('EXTRACT', 'YEAR', Sequelize.col('createdAt')) == year,
-      ],
-    };
+    // const condition = {
+    //   DID: DID,
+    //   [Op.and]: [
+    //     Sequelize.fn('EXTRACT', 'MONTH', Sequelize.col('createdAt')) == monthNumber,
+    //     Sequelize.fn('EXTRACT', 'YEAR', Sequelize.col('createdAt')) == year,
+    //   ],
+    // };
     
     const orders = await Order.findAll({
       where: {

@@ -16,15 +16,18 @@ const ClinicAddress = sequelize.define("clinicAddress", {
   },
   floor: {
     type: DataTypes.STRING,
+    allowNull: false,
   },
   premisesName: {
     type: DataTypes.STRING,
   },
   landmark: {
     type: DataTypes.STRING,
+    allowNull: true,
   },
   areaRoad: {
     type: DataTypes.STRING,
+    allowNull: false,
   },
   city: {
     type: DataTypes.STRING,
@@ -40,6 +43,7 @@ const ClinicAddress = sequelize.define("clinicAddress", {
   },
   clinicContactNumber: {
     type: DataTypes.STRING,
+    allowNull: true,
   },
   googleMapUrl: {
     type: DataTypes.STRING,

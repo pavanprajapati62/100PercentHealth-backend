@@ -10,6 +10,7 @@ const orderRoutes = require("./routes/orderRoute");
 const rentRoutes = require("./routes/rentRoute");
 const db = require("./config/db");
 require("./services/rentCron")
+const path = require("path");
 
 const app = express();
 
@@ -21,6 +22,8 @@ db.sequelize.sync({ alter: true }).then(() => {
   console.log("db has been re sync");
 });
 
+console.log("path.join(__dirname)", path.join(__dirname));
+app.use("/public", express.static(path.join(__dirname, "public")));
 app.use("/api/auth", authRoutes);
 app.use("/api/doctor", doctorRoutes);
 app.use("/api/store", storeRoutes);
