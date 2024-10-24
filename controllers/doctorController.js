@@ -54,9 +54,7 @@ exports.createDoctor = async (req, res) => {
     // res
     //   .status(500)
     //   .json({ error: "Failed to create doctor and related details." });
-    res
-      .status(500)
-      .json({ error: err });
+    res.status(500).json({ error: err });
   }
 };
 
@@ -73,7 +71,7 @@ exports.getAllDoctors = async (req, res) => {
         PaymentDetails,
         Order,
       ],
-      order: [["createdAt", "DESC"]], 
+      order: [["createdAt", "DESC"]],
     });
     res.status(200).json(doctors);
   } catch (error) {
@@ -98,6 +96,17 @@ exports.getDoctorById = async (req, res) => {
         Order,
       ],
     });
+    console.log("doctor", doctor.pin)
+    try {
+      const decodedPin = jwt.verify(doctor.pin, process.env.JWT_SECRET);
+      plainPin = decodedPin?.pin;
+      const decodedPinB = jwt.verify(doctor.pinB, process.env.JWT_SECRET);
+      plainPinB = decodedPinB?.pinB;
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+    doctor.pin = plainPin;
+    doctor.pinB = plainPinB;
     if (!doctor) return res.status(404).json({ error: "Doctor not found" });
     res.status(200).json(doctor);
   } catch (error) {
@@ -124,34 +133,14 @@ exports.updateDoctor = async (req, res) => {
     });
     if (!doctor) return res.status(404).json({ error: "Doctor not found" });
 
-    // if(doctorDetails.pin) {
-    //   if(doctor.pin) {
-
-    //     var decodedPin = jwt.sign(doctor.pin, process.env.JWT_SECRET);
-    //   }
-    //   if(doctor.pinB) {
-    //     var decodedPinB = jwt.verify(doctor.pinB, process.env.JWT_SECRET);
-    //   }
-  
-    //   // let isMatchPin = await bcrypt.compare(pin, doctor.pin);
-  
-    //   // let isMatchPinB = await bcrypt.compare(pin, doctor.pinB);
-  
-    //   let isMatchPinB = false;
-    //   if (decodedPinB?.pin === pin) {
-    //     isMatchPinB = true
-    //     doctor.is_pin_b = true;
-    //     await doctor.save();
-    //   }
-  
-    //   let isMatchPin = false;
-    //   if (decodedPin?.pin === pin && !isMatchPinB) {
-    //     isMatchPin = true;
-    //     doctor.is_pin_b = false;
-    //     await doctor.save();
-    //   }
-    // }
-    // const token = jwt.sign({ pin: storeDetails.pin }, process.env.JWT_SECRET);
+    if (doctorDetails?.pin) {
+      var decodedPin = jwt.sign({ pin: doctorDetails.pin}, process.env.JWT_SECRET);
+      doctorDetails.pin = decodedPin;
+    }
+    if (doctorDetails?.pinB) {
+      var decodedPinB = jwt.sign({ pinB : doctorDetails.pinB}, process.env.JWT_SECRET);
+      doctorDetails.pinB = decodedPinB;
+    }
 
     await doctor.update(doctorDetails);
     await Compliances.update(compliances, { where: { DID } });
@@ -249,8 +238,8 @@ function decryptPin(token) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     return decoded.pin;
   } catch (err) {
-    console.error('Invalid token:', err.message);
-    return null; 
+    console.error("Invalid token:", err.message);
+    return null;
   }
 }
 
@@ -271,11 +260,11 @@ exports.getDoctorDetail = async (req, res) => {
 
     const lastOrder = await Order.findOne({
       where: { DID: DID },
-      order: [["createdAt", "DESC"]], 
-      limit: 1, 
+      order: [["createdAt", "DESC"]],
+      limit: 1,
     });
 
-    res.status(200).json({doctor, lastOrder});
+    res.status(200).json({ doctor, lastOrder });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -387,13 +376,13 @@ exports.getFrequentProducts = async (req, res) => {
       var frequentProducts = await FrequentProducts.findAll({
         where: { DID: id },
         include: [{ model: Product }],
-        order: [["createdAt", "DESC"]], 
+        order: [["createdAt", "DESC"]],
       });
     } else {
       var frequentProducts = await FrequentProducts.findAll({
         where: { SID: id },
         include: [{ model: Product }],
-        order: [["createdAt", "DESC"]], 
+        order: [["createdAt", "DESC"]],
       });
     }
 
@@ -428,7 +417,7 @@ exports.getAllOrdersOfDoctor = async (req, res) => {
     const filter = req.query?.filter || "all";
 
     let whereClause = {
-      DID
+      DID,
     };
     if (filter === "isClinic") {
       whereClause.isClinic = true;

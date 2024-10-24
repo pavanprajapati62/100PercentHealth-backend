@@ -14,6 +14,7 @@ const Product = require("../models/Product/Product");
 const ProductMargin = require("../models/Product/ProductMargin");
 const StoreProduct = require("../models/Product/StoreProduct");
 const Store = require("../models/Store/Store");
+const cloudinaryUploadImage = require("../utils/cloudinary");
 
 exports.createOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -133,16 +134,31 @@ exports.uploadImage = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
-    console.log("req.file.path===========",req.file.path)
+    console.log("req.file===========",req.file)
 
-    const filePath = req.file.path;
+    // const ipAddress = "192.168.0.121"; // Replace with your local machine's IP
+    // const port = 5000; // Make sure this matches your server's port
+
+    // console.log("req.file.filename==============", req.file.filename);
+    // // const fileUrl = `http://${ipAddress}:${port}/public/images/${req.file.filename}`;
+
+    // const fileUrl = `https://health100.manageprojects.in/public/images/${req.file.filename}`;
+    // console.log("fileUrl=============",fileUrl)
+
+    // const fileUrl1 = `/var/www/100PercentHealth-backend/public/images/${req.file.filename}`;
+    var locaFilePath = req?.file?.path
+    console.log("locaFilePath=============", locaFilePath)
+    if(locaFilePath) {
+      var result = await cloudinaryUploadImage(locaFilePath)
+    }
+    console.log("result===============", result)
 
     res.status(200).json({
       message: "File uploaded successfully",
-      filePath: filePath,
+      filePath: result?.url,
     });
   } catch (error) {
-    res.status(500).json({ error: "An error occurred during the upload" });
+    res.status(500).json({ error: error });
   }
 };
 
@@ -257,8 +273,9 @@ exports.updateOrder = async (req, res) => {
     if (products && products.length > 0) {
       for (const product of products) {
         const { productId, ...productDetails } = product;
+        console.log("productId", productId)
         await OrderProduct.update(productDetails, {
-          where: { id: productId, OID },
+          where: { IID: productId, OID },
         });
       }
     }

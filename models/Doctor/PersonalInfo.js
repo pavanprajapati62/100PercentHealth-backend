@@ -24,30 +24,37 @@ const PersonalInfo = sequelize.define("personalInfo", {
   },
   tagline: {
     type: DataTypes.STRING,
+    allowNull: true,
   },
   qualificationSpecialisation: {
     type: DataTypes.STRING,
+    allowNull: false,
   },
   experience: {
     type: DataTypes.INTEGER,
+    allowNull: false,
   },
   operatorName: {
     type: DataTypes.STRING,
+    allowNull: true,
   },
   managerName: {
     type: DataTypes.STRING,
+    allowNull: true,
   },
   about1: {
     type: DataTypes.TEXT,
     validate: {
       len: [0, 120],
     },
+    allowNull: true,
   },
   about2: {
     type: DataTypes.TEXT,
     validate: {
       len: [0, 120],
     },
+    allowNull: true,
   },
 });
 

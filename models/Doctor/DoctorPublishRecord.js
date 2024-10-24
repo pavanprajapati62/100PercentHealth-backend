@@ -24,20 +24,28 @@ const DoctorPublishRecord = sequelize.define("doctorPublishRecord", {
     allowNull: true,
   },
   trxType: {
-    type: DataTypes.STRING,
+    type: DataTypes.INTEGER,
     allowNull: false,
   },
   date: {
     type: DataTypes.STRING,
     allowNull: true,
   },
-  currentDoctorStatus: {
-    type: DataTypes.ENUM("ACTIVE", "AWAY", "CLOSED"),
+  period: {
+    type: DataTypes.STRING,
     allowNull: true,
   },
-  is_pin_b: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
+  fetchedRent: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  paidRent: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  trxId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
   },
 });
 

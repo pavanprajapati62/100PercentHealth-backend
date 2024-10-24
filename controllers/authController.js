@@ -65,7 +65,6 @@ exports.doctorLogin = async (req, res) => {
     }
 
     if(doctor.pin) {
-
       var decodedPin = jwt.verify(doctor.pin, process.env.JWT_SECRET);
     }
     if(doctor.pinB) {
@@ -77,7 +76,7 @@ exports.doctorLogin = async (req, res) => {
     // let isMatchPinB = await bcrypt.compare(pin, doctor.pinB);
 
     let isMatchPinB = false;
-    if (decodedPinB?.pin === pin) {
+    if (decodedPinB?.pinB === pin) {
       isMatchPinB = true
       doctor.is_pin_b = true;
       await doctor.save();
