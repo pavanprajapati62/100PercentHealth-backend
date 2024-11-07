@@ -110,12 +110,16 @@ exports.updateStore = async (req, res) => {
     const store = await Store.findOne({
       where: { SID },
     });
+    console.log("1111111111111111111111111111111111111111");
     if (!store) return res.status(404).json({ error: "Store not found" });
-    if(storeDetails.pin) {
+    console.log("storeDetails.pin", storeDetails?.pin);
+    if (storeDetails?.pin) {
+      console.log("333333333333333333333333333333333333");
       const token = jwt.sign({ pin: storeDetails.pin }, process.env.JWT_SECRET);
       storeDetails.pin = token;
     }
 
+    console.log("222222222222222222222222222222222222222");
     await store.update(storeDetails);
     await Compliances.update(compliances, { where: { SID } });
     await Address.update(address, { where: { SID } });
@@ -140,7 +144,7 @@ exports.updateStore = async (req, res) => {
                 billing.deliveryChargesSameState || null,
               deliveryChargesOtherState:
                 billing.deliveryChargesOtherState || null,
-              noDiscount: billing.no_discount || null,
+              noDiscount: billing.noDiscount || null,
               applyAll: billing.applyAll,
             });
           } else {
@@ -158,7 +162,7 @@ exports.updateStore = async (req, res) => {
                   billing.deliveryChargesOtherState ||
                   existingStoreBillingDetail.deliveryChargesOtherState,
                 noDiscount:
-                  billing.no_discount || existingStoreBillingDetail.noDiscount,
+                  billing.noDiscount || existingStoreBillingDetail.noDiscount,
                 applyAll: billing.applyAll,
               },
               { where: { SID: store.SID } }
@@ -197,7 +201,7 @@ exports.updateStore = async (req, res) => {
           billing.deliveryChargesOtherState,
           "deliveryChargesOtherState"
         );
-        await updateBillingDetails(billing.no_discount, "noDiscount");
+        await updateBillingDetails(billing.noDiscount, "noDiscount");
         await updateBillingDetails(billing.applyAll, "applyAll");
       }
     }
@@ -242,14 +246,14 @@ exports.deleteStore = async (req, res) => {
   const SID = req.params.id;
   try {
     await StoreProduct.destroy({ where: { SID } });
-    
+
     const orders = await Order.findAll({ where: { SID } });
-    const orderIds = orders?.map(order => order?.OID);
+    const orderIds = orders?.map((order) => order?.OID);
 
     await DoctorOrderMargins.destroy({ where: { OID: orderIds } });
     await OrderProduct.destroy({ where: { SID } });
     await Order.destroy({ where: { SID } });
-    
+
     const store = await Store.destroy({
       where: { SID: SID },
     });
@@ -541,7 +545,7 @@ exports.getProductsOfStore = async (req, res) => {
 
     const { rows: products, count } = await StoreProduct.findAndCountAll({
       where: { SID: id },
-      attributes: ['productName', 'storeStock', 'units'],
+      attributes: ["storeStock", "units"],
       include: [Product],
       order: [["createdAt", "DESC"]],
       limit,
@@ -663,9 +667,8 @@ exports.getOrders = async (req, res) => {
     const { count, rows: orders } = await Order.findAndCountAll({
       where: whereConditions,
       include: [
-        PatientDetails,
+        { model: PatientDetails, include: [PatientAddress] },
         Billing,
-        PatientAddress,
         OrderProduct,
         Invoice,
         {
@@ -690,7 +693,7 @@ exports.getOrders = async (req, res) => {
     res.status(200).json({
       currentPage: page,
       limit,
-      totalItems: count,
+      totalItems: orders?.length,
       totalPages: Math.ceil(count / limit),
       orders,
     });
@@ -699,31 +702,109 @@ exports.getOrders = async (req, res) => {
   }
 };
 
+const calculateDaysDifference = (date) => {
+  const today = new Date();
+  const orderDate = new Date(date);
+  const timeDiff = today - orderDate;
+  const daysDifference = Math.floor(timeDiff / (1000 * 60 * 60 * 24)); // Convert milliseconds to days
+  return daysDifference;
+};
+
+const filterOrdersByDosageAndTimeFrame = (orders) => {
+  return orders.filter((order) => {
+    const has100PercentBalance = order?.orderProducts.some((product) => {
+      const rxUnits = Number(product.rxUnits);
+      const orderQty = Number(product.orderQty);
+      const balanceUnits = rxUnits - orderQty;
+      const balanceDosagePercentage =
+        rxUnits > 0 ? (balanceUnits / rxUnits) * 100 : 0;
+      return balanceDosagePercentage === 100;
+    });
+
+    const hasLessThan100PercentBalance = order?.orderProducts.some(
+      (product) => {
+        const rxUnits = Number(product.rxUnits);
+        const orderQty = Number(product.orderQty);
+        const balanceUnits = rxUnits - orderQty;
+        const balanceDosagePercentage =
+          rxUnits > 0 ? (balanceUnits / rxUnits) * 100 : 0;
+        return balanceDosagePercentage < 100;
+      }
+    );
+
+    const daysSinceOrder = calculateDaysDifference(order?.createdAt);
+
+    // Show orders with 100% balance dosage within 1 week
+    if (has100PercentBalance && daysSinceOrder <= 7) {
+      return true;
+    }
+
+    // Show orders with less than 100% balance dosage within 1 month
+    if (hasLessThan100PercentBalance && daysSinceOrder <= 30) {
+      return true;
+    }
+
+    return false; // Filter out orders that don't meet criteria
+  });
+};
+
 exports.getOrdersWithoutCancel = async (req, res) => {
-  // try {
-  //   const SID = req.userId;
+  try {
+    const SID = req.userId;
 
-  //   const { addressType = "" } = req.body;
+    const { addressType = "" } = req.body;
 
-  //   const validAddressTypes = ["isClinic", "isCollect", "isAddress"];
+    const validAddressTypes = ["isClinic", "isCollect", "isAddress"];
 
-  //   let whereConditions = {
-  //     SID,
-  //     isCancelled: false,
-  //   };
+    let whereConditions = {
+      SID,
+      isCancelled: false,
+    };
 
-  //   if (addressType.length === 0) {
-  //     whereConditions = { SID, isCancelled: false };
-  //   } else {
-  //     if (addressType.length > 0 &&!validAddressTypes.includes(addressType)) {
-  //       return res.status(400).json({ error: "Invalid address type" });
-  //     }
-  //     whereConditions[addressType] = true;
-  //   }
+    if (addressType.length === 0) {
+      whereConditions = { SID, isCancelled: false };
+    } else {
+      if (addressType.length > 0 && !validAddressTypes.includes(addressType)) {
+        return res.status(400).json({ error: "Invalid address type" });
+      }
+      whereConditions[addressType] = true;
+    }
 
-  //   const page = parseInt(req.query.page) || 1;
-  //   const limit = parseInt(req.query.limit) || 10;
-  //   const offset = (page - 1) * limit;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
-  //   const { count, rows: orders } = await St
-}
+    const { count, rows: orders } = await Order.findAndCountAll({
+      where: whereConditions,
+      include: [
+        PatientDetails,
+        Billing,
+        PatientAddress,
+        OrderProduct,
+        Invoice,
+        {
+          model: Doctor,
+          attributes: ["DID", "contactNumber", "role"],
+          include: [
+            {
+              model: PersonalInfo,
+            },
+            {
+              model: ClinicAddress,
+              attributes: ["premisesName", "clinicContactNumber"],
+            },
+          ],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit,
+      offset,
+    });
+    console.log("orders==================", orders);
+    res.status(200).json({
+      orders,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

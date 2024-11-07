@@ -8,6 +8,8 @@ const {
   searchOrderData,
   searchCustomerData,
   getAllPatients,
+  publishRecord,
+  getAllPublishRecords,
 } = require("../controllers/authController");
 const { verifyToken, isAdmin, isAdminOrDoctor } = require("../middlewares/roleMiddleware");
 
@@ -21,5 +23,7 @@ router.get("/admin/get-admin-detail", [verifyToken, isAdmin], getAdminDetail);
 router.get("/search-order-data", searchOrderData)
 router.get("/search-customer-data", searchCustomerData)
 router.get("/get-all-patients", [verifyToken, isAdminOrDoctor], getAllPatients);
+router.post("/publish-record", [verifyToken, isAdmin], publishRecord);
+router.get("/get-all-publish-record", [verifyToken, isAdmin], getAllPublishRecords);
 
 module.exports = router;

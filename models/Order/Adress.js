@@ -10,14 +10,14 @@ const PatientAddress = sequelize.define("patientAddress", {
     },
     allowNull: false,
   },
-  OID: {
-    type: DataTypes.STRING,
-    references: {
-      model: "orders",
-      key: "OID",
-    },
-    allowNull: false,
-  },
+  // OID: {
+  //   type: DataTypes.STRING,
+  //   references: {
+  //     model: "orders",
+  //     key: "OID",
+  //   },
+  //   allowNull: false,
+  // },
   addressType: {
     type: DataTypes.ENUM("home", "work", "other"),
     allowNull: true,

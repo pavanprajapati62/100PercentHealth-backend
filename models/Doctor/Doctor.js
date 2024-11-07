@@ -49,6 +49,7 @@ const Doctor = sequelize.define("doctor", {
   currentDoctorStatus: {
     type: DataTypes.ENUM("ACTIVE", "AWAY", "CLOSED"),
     allowNull: true,
+    defaultValue: "CLOSED",
   },
   is_pin_b: {
     type: DataTypes.BOOLEAN,

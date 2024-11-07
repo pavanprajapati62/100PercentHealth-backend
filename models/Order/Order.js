@@ -5,6 +5,8 @@ const Billing = require("./Billing");
 const OrderProduct = require("./Product");
 const PatientAddress = require("./Adress");
 const Invoice = require("./Invoice");
+const DoctorOrderMargins = require("../Doctor/DoctorOrderMargins");
+const PendingDoctorMargin = require("../Rent/PendingDoctorMargin");
 
 const Order = sequelize.define("order", {
   OID: {
@@ -81,7 +83,51 @@ const Order = sequelize.define("order", {
     },
     allowNull: false,
   },
+  PID: {
+    type: DataTypes.STRING,
+    references: {
+      model: "patientDetails",
+      key: "PID",
+    },
+    allowNull: true,
+  },
   filePath: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  acceptTime: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  packedTime: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  dispatchTime: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  deliveredTime: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  QP: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  QD: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  PC: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  DC: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  ET: {
     type: DataTypes.STRING,
     allowNull: true,
   },
@@ -108,21 +154,16 @@ Order.beforeCreate(async (order) => {
   order.OID = newOID;
 });
 
-Order.hasOne(PatientDetails, {
-  foreignKey: "OID",
-  sourceKey: "OID",
-  onDelete: "CASCADE",
-});
 Order.hasOne(Billing, {
   foreignKey: "OID",
   sourceKey: "OID",
   onDelete: "CASCADE",
 });
-Order.hasOne(PatientAddress, {
-  foreignKey: "OID",
-  sourceKey: "OID",
-  onDelete: "CASCADE",
-});
+// Order.hasOne(PatientAddress, {
+//   foreignKey: "OID",
+//   sourceKey: "OID",
+//   onDelete: "CASCADE",
+// });
 Order.hasOne(Invoice, {
   foreignKey: "OID",
   sourceKey: "OID",
@@ -136,9 +177,21 @@ Order.hasMany(OrderProduct, {
 });
 OrderProduct.belongsTo(Order, { foreignKey: "OID", targetKey: "OID" });
 
-PatientDetails.belongsTo(Order, { foreignKey: "OID", targetKey: "OID" });
 Billing.belongsTo(Order, { foreignKey: "OID", targetKey: "OID" });
-PatientAddress.belongsTo(Order, { foreignKey: "OID", targetKey: "OID" });
+// PatientAddress.belongsTo(Order, { foreignKey: "OID", targetKey: "OID" });
 Invoice.belongsTo(Order, { foreignKey: "OID", targetKey: "OID" });
+
+Order.hasOne(DoctorOrderMargins, { foreignKey: 'OID', sourceKey: 'OID' });
+DoctorOrderMargins.belongsTo(Order, { foreignKey: 'OID', targetKey: 'OID' });
+
+Order.hasOne(PendingDoctorMargin, { foreignKey: 'OID', sourceKey: 'OID' });
+PendingDoctorMargin.belongsTo(Order, { foreignKey: 'OID', targetKey: 'OID' });
+
+PatientDetails.hasMany(Order, { foreignKey: "PID", sourceKey: "PID" });
+Order.belongsTo(PatientDetails, {
+  foreignKey: "PID",
+  targetKey: "PID",
+  onDelete: "CASCADE",
+});
 
 module.exports = Order;

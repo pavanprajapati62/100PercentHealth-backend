@@ -17,6 +17,7 @@ const {
   updateStoreStatus,
   getOrders,
   getProductsOfDoctor,
+  getOrdersWithoutCancel,
   // getDoctorsByStore,
 } = require("../controllers/storeController");
 const {
@@ -31,6 +32,7 @@ router.post("/create", [verifyToken, isAdmin], createStore);
 router.post("/assign-doctors", [verifyToken, isAdmin], assignDoctorToStore);
 // router.get("/store/:SID/doctors", [verifyToken, isAdmin], getDoctorsByStore);
 router.get("/search-store", searchStore);
+router.get("/orders-active", [verifyToken, isStore], getOrdersWithoutCancel)
 router.post("/orders", [verifyToken, isStore], getOrders)
 router.get("/get-doctors/:id", [verifyToken, isStoreOrAdmin], getDoctorsOfStore);
 router.get("/get-doctors", [verifyToken, isAdmin], getDoctorsNotAssigned);

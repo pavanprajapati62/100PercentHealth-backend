@@ -105,7 +105,7 @@ const OrderProduct = sequelize.define("orderProduct", {
   },
   takenTime: {
     type: DataTypes.ENUM("A/F", "B/F", "X"),
-    allowNull: false,
+    allowNull: true,
   },
   extra: {
     type: DataTypes.STRING,

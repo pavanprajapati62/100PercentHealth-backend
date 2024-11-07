@@ -77,7 +77,7 @@ Product.beforeCreate(async (product) => {
     const lastOIDNumber = parseInt(lastproduct.IID.slice(3), 10);
     newIID = `IID${String(lastOIDNumber + 1).padStart(3, '0')}`;
   } else {
-    // First time creation, start with SID001
+    // First time creation, start with IID001
     newIID = 'IID001';
   }
 

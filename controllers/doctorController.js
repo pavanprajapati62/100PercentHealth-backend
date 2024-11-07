@@ -17,6 +17,21 @@ const Address = require("../models/Store/Address");
 const jwt = require("jsonwebtoken");
 const Billing = require("../models/Order/Billing");
 const OrderProduct = require("../models/Order/Product");
+const { uploadPdf } = require("../utils/cloudinary");
+const puppeteer = require("puppeteer");
+// const fs = require("fs");
+const path = require('path');
+const { generateHTML } = require("../pdf/htmlTemplate");
+const cloudinary = require("cloudinary").v2;
+const fs = require("fs");
+const DoctorPublishRecord = require("../models/Doctor/DoctorPublishRecord");
+
+cloudinary.config({
+  cloud_name: "dsp7l7i4e",
+  api_key: "478458651528647",
+  api_secret: "Z1qVxAqDzs51O_A9oTcUKi-DJD4",
+});
+// require("../temp/temp.pdf")
 
 exports.createDoctor = async (req, res) => {
   try {
@@ -96,7 +111,7 @@ exports.getDoctorById = async (req, res) => {
         Order,
       ],
     });
-    console.log("doctor", doctor.pin)
+    console.log("doctor", doctor.pin);
     try {
       const decodedPin = jwt.verify(doctor.pin, process.env.JWT_SECRET);
       plainPin = decodedPin?.pin;
@@ -134,11 +149,17 @@ exports.updateDoctor = async (req, res) => {
     if (!doctor) return res.status(404).json({ error: "Doctor not found" });
 
     if (doctorDetails?.pin) {
-      var decodedPin = jwt.sign({ pin: doctorDetails.pin}, process.env.JWT_SECRET);
+      var decodedPin = jwt.sign(
+        { pin: doctorDetails.pin },
+        process.env.JWT_SECRET
+      );
       doctorDetails.pin = decodedPin;
     }
     if (doctorDetails?.pinB) {
-      var decodedPinB = jwt.sign({ pinB : doctorDetails.pinB}, process.env.JWT_SECRET);
+      var decodedPinB = jwt.sign(
+        { pinB: doctorDetails.pinB },
+        process.env.JWT_SECRET
+      );
       doctorDetails.pinB = decodedPinB;
     }
 
@@ -432,7 +453,7 @@ exports.getAllOrdersOfDoctor = async (req, res) => {
       include: [
         PatientDetails,
         Billing,
-        PatientAddress,
+        // PatientAddress,
         OrderProduct,
         {
           model: Doctor,
@@ -463,3 +484,53 @@ exports.getAllOrdersOfDoctor = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.createPdf = async (req, res) => {
+  try {
+    const data = req.body;
+    const htmlContent = generateHTML(data);
+
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+
+    await page.setContent(htmlContent, { waitUntil: "domcontentloaded" });
+    let pdfCloudinaryPath = null;
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+    });
+    cloudinary.uploader
+      .upload_stream({ resource_type: 'raw' }, async (error, result) => {
+        if (error) {
+          console.error(error);
+          res
+            .status(500)
+            .json({ message: error.message });
+          return;
+        }
+
+        pdfCloudinaryPath = result.secure_url;
+        res.status(200).json({ success: true, url: pdfCloudinaryPath });
+      })
+      .end(pdfBuffer);
+
+    await browser.close();
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getPublishRecordForDoctor = async (req, res) => {
+  try {
+    const DID = req.params.id;
+    const record = await DoctorPublishRecord.findAll({
+      where: { DID: DID },
+    });
+
+    res.status(200).json(record || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
