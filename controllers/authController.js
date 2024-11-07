@@ -131,7 +131,7 @@ exports.storeLogin = async (req, res) => {
     // const isMatch = await bcrypt.compare(pin, store.pin);
     let isMatch = false;
     const decodedPin = jwt.verify(store.pin, process.env.JWT_SECRET);
-    console.log("decodedPin========", decodedPin);
+    //console.log("decodedPin========", decodedPin);
     if (decodedPin.pin === pin) {
       isMatch = true;
     }
