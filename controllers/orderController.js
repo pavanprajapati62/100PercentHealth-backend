@@ -14,10 +14,10 @@ const Product = require("../models/Product/Product");
 const ProductMargin = require("../models/Product/ProductMargin");
 const StoreProduct = require("../models/Product/StoreProduct");
 const Store = require("../models/Store/Store");
-const cloudinaryUploadImage = require("../utils/cloudinary");
+const { cloudinaryUploadImage } = require("../utils/cloudinary");
+const moment = require("moment");
 
 exports.createOrder = async (req, res) => {
-  const transaction = await sequelize.transaction();
   try {
     const id = req.userId;
     const {
@@ -53,78 +53,70 @@ exports.createOrder = async (req, res) => {
     if (!store) {
       return res.status(404).json({ message: "Store not found" });
     }
+    console.log("doctor.DID====================", doctor.DID)
 
-    // for(let i = 0; i < products.length; i++) {
-    //   const { orderUnits, productName } = products[i];
-    //   const storeProduct = await StoreProduct.findOne({
-    //     where: { SID: store.SID, productName: productName },
-    //   });
-    //   const storeProductData = storeProduct?.get({ plain: true });
+    let patientDetails = await PatientDetails.findOne({
+      where: { phoneNumber: patient?.phoneNumber },
+    });
 
-    //   if (storeProductData?.storeStock < orderUnits) {
-    //     return res.status(404).json({
-    //       message: `Store ${SID} stock is less than the required units`,
-    //     });
-    //   }
-    // }
-
-    const order = await Order.create(
-      {
-        payment,
-        isClinic: delivery.isClinic || false,
-        isCollect: delivery.isCollect || false,
-        isAddress: delivery.isAddress || false,
-        prescription: prescription || "",
-        SID: store.SID,
+    if (!patientDetails) {
+      // Create new patient details if not found
+      patientDetails = await PatientDetails.create({
+        ...patient,
         DID: doctor.DID,
-        filePath: filePath || "",
-      },
-      { transaction }
-    );
+      });
+    }
+
+    const PID = patientDetails.PID;
+
+    const order = await Order.create({
+      payment,
+      isClinic: delivery.isClinic || false,
+      isCollect: delivery.isCollect || false,
+      isAddress: delivery.isAddress || false,
+      prescription: prescription || "",
+      SID: store.SID,
+      DID: doctor.DID,
+      filePath: filePath || "",
+      PID,
+    });
     const orderOID = order.OID;
 
     if (!orderOID) {
       throw new Error("Failed to generate OID for the order.");
     }
 
-    const patientDetail = await PatientDetails.create(
-      {
-        ...patient,
-        OID: orderOID,
-        DID: doctor.DID,
-      },
-      { transaction }
-    );
+    await Billing.create({ ...billing, OID: orderOID });
 
-    await Billing.create({ ...billing, OID: orderOID }, { transaction });
+    let patientAddress = await PatientAddress.findOne({
+      where: { PID: PID }, // Change this to your specific logic if needed
+    });
 
-    if (delivery.address) {
-      await PatientAddress.create(
-        {
-          ...delivery.address,
-          PID: patientDetail.PID,
-          OID: orderOID,
-        },
-        { transaction }
-      );
+    if (patientAddress) {
+      // Update existing address
+      await patientAddress.update({ ...delivery.address });
+    } else if (delivery?.address) {
+      // Create new address if it doesn't exist
+      await PatientAddress.create({
+        ...delivery.address,
+        PID: patientDetails.PID,
+      });
     }
 
     if (products && products.length > 0) {
       const productPromises = products.map((product) =>
-        OrderProduct.create(
-          { ...product, OID: orderOID, IID: product?.productId, SID: store.SID  },
-          { transaction }
-        )
+        OrderProduct.create({
+          ...product,
+          OID: orderOID,
+          IID: product?.productId,
+          SID: store.SID,
+        })
       );
       await Promise.all(productPromises);
     }
 
-    await transaction.commit();
-    res
-      .status(201)
-      .json({ message: "Order and related details created successfully." });
+    res.status(201).json({ message: order });
   } catch (err) {
-    await transaction.rollback();
     res.status(500).json({ error: err });
   }
 };
@@ -134,7 +126,6 @@ exports.uploadImage = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
-    console.log("req.file===========",req.file)
 
     // const ipAddress = "192.168.0.121"; // Replace with your local machine's IP
     // const port = 5000; // Make sure this matches your server's port
@@ -146,12 +137,10 @@ exports.uploadImage = async (req, res) => {
     // console.log("fileUrl=============",fileUrl)
 
     // const fileUrl1 = `/var/www/100PercentHealth-backend/public/images/${req.file.filename}`;
-    var locaFilePath = req?.file?.path
-    console.log("locaFilePath=============", locaFilePath)
-    if(locaFilePath) {
-      var result = await cloudinaryUploadImage(locaFilePath)
+    var locaFilePath = req?.file?.path;
+    if (locaFilePath) {
+      var result = await cloudinaryUploadImage(locaFilePath);
     }
-    console.log("result===============", result)
 
     res.status(200).json({
       message: "File uploaded successfully",
@@ -199,7 +188,7 @@ exports.getAllOrders = async (req, res) => {
       include: [
         PatientDetails,
         Billing,
-        PatientAddress,
+        // PatientAddress,
         OrderProduct,
         {
           model: Doctor,
@@ -214,6 +203,7 @@ exports.getAllOrders = async (req, res) => {
             },
           ],
         },
+        Invoice
       ],
       limit,
       offset,
@@ -273,7 +263,7 @@ exports.updateOrder = async (req, res) => {
     if (products && products.length > 0) {
       for (const product of products) {
         const { productId, ...productDetails } = product;
-        console.log("productId", productId)
+        console.log("productId", productId);
         await OrderProduct.update(productDetails, {
           where: { IID: productId, OID },
         });
@@ -314,7 +304,7 @@ exports.deleteOrder = async (req, res) => {
 const getMargin = (mrp, categoryPercentage) => {
   const margin = (mrp * categoryPercentage) / 100;
   return parseFloat(margin.toFixed(2));
-}
+};
 
 const getDoctorMargin = async (orderId, doctorId, orderProducts) => {
   try {
@@ -323,16 +313,16 @@ const getDoctorMargin = async (orderId, doctorId, orderProducts) => {
       include: [{ model: AccountCategory }],
     });
     const doctorData = doctor.get({ plain: true });
-    
+
     let totalMarginPercentage = 0;
-    for(let i = 0; i < orderProducts.length; i++) {
+    for (let i = 0; i < orderProducts.length; i++) {
       const { IID, mrp } = orderProducts[i];
       const product = await Product.findOne({
         where: { IID: IID },
         include: [{ model: ProductMargin }],
       });
       const productData = product?.get({ plain: true });
-      
+
       const doctorCategory = doctorData?.accountCategory?.category;
       const categoryPercentage = productData?.productMargin[doctorCategory];
 
@@ -345,8 +335,8 @@ const getDoctorMargin = async (orderId, doctorId, orderProducts) => {
     await DoctorOrderMargins.create({
       DID: doctorId,
       OID: orderId,
-      marginPercentage: totalMarginPercentage
-    })
+      marginPercentage: totalMarginPercentage,
+    });
 
     return totalMarginPercentage;
   } catch (error) {
@@ -373,11 +363,10 @@ exports.updateOrderStatus = async (req, res) => {
     let invoiceData = null;
 
     if (isAccepted) {
-
-      for(let i = 0; i < orderData.orderProducts.length; i++) {
-        const { IID, orderUnits, SID, productName, orderQty } = orderData.orderProducts[i];
+      for (let i = 0; i < orderData.orderProducts.length; i++) {
+        const { IID, SID, orderQty } = orderData.orderProducts[i];
         const storeProduct = await StoreProduct.findOne({
-          where: { IID: IID, SID: SID, productName: productName },
+          where: { IID: IID, SID: SID },
         });
         const storeProductData = storeProduct?.get({ plain: true });
 
@@ -391,11 +380,23 @@ exports.updateOrderStatus = async (req, res) => {
       try {
         await sequelize.transaction(async (t) => {
           for (let i = 0; i < orderData?.orderProducts.length; i++) {
-            const { IID, orderUnits, SID, productName, orderQty } = orderData?.orderProducts[i];
-            const storeProduct = await StoreProduct.findOne({ where: { IID: IID, SID: SID, productName: productName }, transaction: t });
+            const { IID, SID, orderQty } = orderData?.orderProducts[i];
+            const storeProduct = await StoreProduct.findOne({
+              where: { IID: IID, SID: SID },
+              transaction: t,
+            });
+            if (!storeProduct) {
+              return res
+                .status(404)
+                .json({ message: "Store Product not found" });
+            }
+            console.log("storeProduct==================", storeProduct);
             const newStock = storeProduct.storeStock - orderQty;
-    
-            await storeProduct.update({ storeStock: newStock }, { transaction: t });
+
+            await storeProduct.update(
+              { storeStock: newStock },
+              { transaction: t }
+            );
           }
         });
       } catch (error) {
@@ -404,6 +405,7 @@ exports.updateOrderStatus = async (req, res) => {
 
       order.isAccepted = true;
       order.orderStatus = "Accepted";
+      order.acceptTime = new Date();
 
       const { payableAmount } = await Billing.findOne({
         where: { OID: OID },
@@ -413,18 +415,18 @@ exports.updateOrderStatus = async (req, res) => {
       // const newIVID = `IVID${String(invoiceCount + 1).padStart(3, "0")}`;
 
       const lastInvoice = await Invoice.findOne({
-        order: [['IVID', 'DESC']],
-        attributes: ['IVID'],
+        order: [["IVID", "DESC"]],
+        attributes: ["IVID"],
       });
-    
+
       let newIVID;
-    
+
       if (lastInvoice && lastInvoice.IVID) {
         const lastIVIDNumber = parseInt(lastInvoice.IVID.slice(4), 10);
-        newIVID = `IVID${String(lastIVIDNumber + 1).padStart(3, '0')}`;
+        newIVID = `IVID${String(lastIVIDNumber + 1).padStart(3, "0")}`;
       } else {
         // First time creation, start with IVID001
-        newIVID = 'IVID001';
+        newIVID = "IVID001";
       }
 
       invoiceData = await Invoice.create({
@@ -433,7 +435,7 @@ exports.updateOrderStatus = async (req, res) => {
         invoiceNo: newIVID,
         invoiceAmount: payableAmount,
       });
-  
+
       var doctorMargin = await getDoctorMargin(
         orderData.OID,
         orderData.DID,
@@ -443,14 +445,41 @@ exports.updateOrderStatus = async (req, res) => {
     if (isPacked) {
       order.isPacked = true;
       order.orderStatus = "Packed";
+      order.packedTime = new Date();
+
+      const duration = moment.duration(moment(order.packedTime).diff(moment(order.acceptTime)));
+      order.QP = `${duration.days()} days ${duration.hours()} hours ${duration.minutes()} minutes`;
     }
     if (isDispatched) {
       order.isDispatched = true;
       order.orderStatus = "Dispatched";
+      order.dispatchTime = new Date();
+
+      const duration = moment.duration(moment(order.dispatchTime).diff(moment(order.acceptTime)));
+      order.QD = `${duration.days()} days ${duration.hours()} hours ${duration.minutes()} minutes`;
     }
     if (isDelivered) {
       order.isDelivered = true;
       order.orderStatus = "Delivered";
+      order.deliveredTime = new Date();
+
+      if (order.packedTime) {
+        // Calculate PC (Packed to Delivered Time)
+        const duration = moment.duration(moment(order.deliveredTime).diff(moment(order.packedTime)));
+        order.PC = `${duration.days()} days ${duration.hours()} hours ${duration.minutes()} minutes`;
+      }
+
+      if (order.dispatchTime) {
+        // Calculate DC (Dispatch to Delivered Time)
+        const duration = moment.duration(moment(order.deliveredTime).diff(moment(order.dispatchTime)));
+        order.DC = `${duration.days()} days ${duration.hours()} hours ${duration.minutes()} minutes`;
+      }
+
+      if (order.acceptTime) {
+        // Calculate ET (Accept to Delivered Time)
+        const duration = moment.duration(moment(order.deliveredTime).diff(moment(order.acceptTime)));
+        order.ET = `${duration.days()} days ${duration.hours()} hours ${duration.minutes()} minutes`;
+      }
     }
 
     await order.save();
@@ -459,7 +488,7 @@ exports.updateOrderStatus = async (req, res) => {
       return res.status(200).json({
         message: "Order status updated and invoice created successfully",
         invoiceData,
-        doctorMargin
+        doctorMargin,
       });
     } else {
       return res
@@ -499,3 +528,21 @@ exports.cancelOrder = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
+
+exports.getPatientByID = async (req, res) => {
+  try {
+    const patientID = req.params.id;
+    const patient = await PatientDetails.findOne({
+      where: { PID: patientID },
+      include: [{ model: PatientAddress }, {model: Order}],
+    });
+
+    if (!patient) {
+      return res.status(404).json({ message: "Patient not found" });
+    }
+
+    res.status(200).json(patient);
+  } catch(error) {
+    return res.status(500).json({ error: error.message });
+  }
+}

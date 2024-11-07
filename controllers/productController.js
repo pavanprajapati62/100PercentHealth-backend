@@ -130,7 +130,7 @@ exports.getProductById = async (req, res) => {
 
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
-  const { marginPercentage, units, ...updatedData } = req.body;
+  const { marginPercentage, units, storeQty, ...updatedData } = req.body;
 
   try {
     const product = await Product.findOne({
@@ -162,6 +162,25 @@ exports.updateProduct = async (req, res) => {
         await productMargin.update(marginPercentage);
       }
     }
+
+    if (storeQty) {
+      for (const { storeId, Qty } of storeQty) {
+        const [storeProduct, created] = await StoreProduct.findOrCreate({
+          where: { IID: id, SID: storeId },
+          defaults: {
+            IID: id,
+            SID: storeId,
+            storeStock: Qty,
+          },
+        });
+
+        if (!created) {
+          // If it already exists, update the stock quantity
+          await storeProduct.update({ storeStock: Qty });
+        }
+      }
+    }
+
     res.status(200).json({ message: "Product updated successfully", product });
   } catch (error) {
     console.error("Error updating product:", error);

@@ -16,7 +16,7 @@ const DoctorPublishRecord = sequelize.define("doctorPublishRecord", {
     allowNull: false,
   },
   gateways: {
-    type: DataTypes.STRING,
+    type: DataTypes.INTEGER,
     allowNull: false,
   },
   account: {
@@ -24,11 +24,11 @@ const DoctorPublishRecord = sequelize.define("doctorPublishRecord", {
     allowNull: true,
   },
   trxType: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.STRING,
     allowNull: false,
   },
   date: {
-    type: DataTypes.STRING,
+    type: DataTypes.DATE,
     allowNull: true,
   },
   period: {
@@ -36,7 +36,7 @@ const DoctorPublishRecord = sequelize.define("doctorPublishRecord", {
     allowNull: true,
   },
   fetchedRent: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.FLOAT,
     allowNull: false,
   },
   paidRent: {

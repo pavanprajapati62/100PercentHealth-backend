@@ -37,6 +37,7 @@ const Store = sequelize.define("store", {
   currentStoreStatus: {
     type: DataTypes.ENUM("ACTIVE", "AWAY", "CLOSED"),
     allowNull: true,
+    defaultValue: "CLOSED",
   },
 });
 

@@ -15,6 +15,8 @@ const {
   getFrequentProducts,
   removeFrequentProduct,
   getAllOrdersOfDoctor,
+  createPdf,
+  getPublishRecordForDoctor,
 } = require("../controllers/doctorController");
 const {
   verifyToken,
@@ -30,6 +32,7 @@ router.get("/", [verifyToken, isAdmin], getAllDoctors);
 router.get("/get-all-patients", [verifyToken, isDoctor], getAllPatients);
 router.get("/get-doctor-detail", [verifyToken, isDoctor], getDoctorDetail);
 router.get('/get-orders-doctor', [verifyToken, isDoctor], getAllOrdersOfDoctor)
+router.get("/get-publish-record/:id", [verifyToken, isAdminOrDoctor], getPublishRecordForDoctor);
 router.get("/search-doctor", searchDoctor);
 router.get("/get-billing-detail", [verifyToken, isStoreOrDoctor], getBillingDetails);
 router.get("/get-products-frequent/:id", [verifyToken, iAdminOrStoreOrDoctor], getFrequentProducts)
@@ -38,6 +41,7 @@ router.put("/:id", [verifyToken, isAdminOrDoctor], updateDoctor);
 router.delete("/:id", [verifyToken, isAdmin], deleteDoctor);
 router.patch("/update-doctor-status", [verifyToken, isDoctor], updateDoctorStatus);
 router.post("/add-products-frequent", [verifyToken, isDoctor], addProductsToFrequent);
+router.post("/create-pdf", [verifyToken, isDoctor], createPdf);
 router.delete("/remove-products-frequent/:id", [verifyToken, isDoctor], removeFrequentProduct)
 
 module.exports = router;

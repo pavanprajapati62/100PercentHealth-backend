@@ -9,6 +9,7 @@ const PatientDetails = require("../models/Order/PatientDetails");
 const { Op } = require("sequelize");
 const PersonalInfo = require("../models/Doctor/PersonalInfo");
 const PatientAddress = require("../models/Order/Adress");
+const DoctorPublishRecord = require("../models/Doctor/DoctorPublishRecord");
 
 exports.adminSignUp = async (req, res) => {
   try {
@@ -20,7 +21,7 @@ exports.adminSignUp = async (req, res) => {
     }
 
     const existingUser = await Admin.findOne({ where: { username } });
-    if(existingUser) {
+    if (existingUser) {
       return res.status(400).json({ message: "Username already exist" });
     }
 
@@ -55,7 +56,7 @@ exports.doctorLogin = async (req, res) => {
   const { contactNumber, pin } = req.body;
 
   try {
-    if(contactNumber === "" || pin === "" ) {
+    if (contactNumber === "" || pin === "") {
       return res.status(404).json({ message: "Provide credential" });
     }
 
@@ -64,11 +65,13 @@ exports.doctorLogin = async (req, res) => {
       return res.status(404).json({ message: "Doctor not found" });
     }
 
-    if(doctor.pin) {
+    if (doctor.pin) {
       var decodedPin = jwt.verify(doctor.pin, process.env.JWT_SECRET);
+      console.log("decodedPin", decodedPin);
     }
-    if(doctor.pinB) {
+    if (doctor.pinB) {
       var decodedPinB = jwt.verify(doctor.pinB, process.env.JWT_SECRET);
+      console.log("decodedPinB", decodedPinB);
     }
 
     // let isMatchPin = await bcrypt.compare(pin, doctor.pin);
@@ -77,7 +80,7 @@ exports.doctorLogin = async (req, res) => {
 
     let isMatchPinB = false;
     if (decodedPinB?.pinB === pin) {
-      isMatchPinB = true
+      isMatchPinB = true;
       doctor.is_pin_b = true;
       await doctor.save();
     }
@@ -93,7 +96,7 @@ exports.doctorLogin = async (req, res) => {
       return res.status(401).json({ message: "Invalid PIN" });
     }
 
-    doctor.currentDoctorStatus = "ACTIVE"
+    doctor.currentDoctorStatus = "ACTIVE";
     await doctor.save();
 
     const token = jwt.sign(
@@ -128,6 +131,7 @@ exports.storeLogin = async (req, res) => {
     // const isMatch = await bcrypt.compare(pin, store.pin);
     let isMatch = false;
     const decodedPin = jwt.verify(store.pin, process.env.JWT_SECRET);
+    console.log("decodedPin========", decodedPin);
     if (decodedPin.pin === pin) {
       isMatch = true;
     }
@@ -135,7 +139,7 @@ exports.storeLogin = async (req, res) => {
       return res.status(401).json({ message: "Invalid PIN" });
     }
 
-    store.currentStoreStatus = "ACTIVE"
+    store.currentStoreStatus = "ACTIVE";
     await store.save();
 
     const token = jwt.sign(
@@ -181,15 +185,14 @@ exports.searchOrderData = async (req, res) => {
     let count = 0;
 
     if (searchQuery.startsWith("DID")) {
-      const doctorResult = await Doctor.findAndCountAll({
+      const doctorResult = await Order.findAndCountAll({
         where: {
           DID: {
             [Op.iLike]: `%${searchQuery}%`,
           },
         },
         include: [
-          { model: PersonalInfo },
-          { model: Order, include: [{ model: PatientDetails }] },
+          { model: Doctor, include: [{ model: PersonalInfo }] },
           { model: PatientDetails },
         ],
         order: [["createdAt", "DESC"]],
@@ -281,7 +284,6 @@ exports.searchCustomerData = async (req, res) => {
       });
       res.status(200).json(phoneResult || []);
     } else {
-
       if (searchQuery.startsWith("PID")) {
         const patientResult = await PatientDetails.findAndCountAll({
           where: {
@@ -387,3 +389,25 @@ exports.getAllPatients = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.publishRecord = async (req, res) => {
+  try {
+    await DoctorPublishRecord.create(req.body);
+
+    res.status(200).json({ message: "Record published successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getAllPublishRecords = async (req, res) => {
+  try {
+    const records = await DoctorPublishRecord.findAll();
+
+    res.status(200).json(records);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+}
