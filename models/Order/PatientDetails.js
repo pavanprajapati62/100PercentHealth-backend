@@ -40,8 +40,6 @@ const PatientDetails = sequelize.define("patientDetails", {
 });
 
 PatientDetails.beforeCreate(async (patient) => {
-  // const paytientDetailsCount = await PatientDetails.count();
-  // const newPID = `PID${String(paytientDetailsCount + 1).padStart(3, "0")}`;
 
   const lastPatient = await PatientDetails.findOne({
     order: [['PID', 'DESC']],

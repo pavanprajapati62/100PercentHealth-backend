@@ -25,7 +25,7 @@ exports.login = async (username, pin) => {
 
   const isPinValid = bcrypt.compareSync(pin, user.pin);
   if (!isPinValid) {
-    throw new Error("Invalid PIN.");
+    throw new Error("Invalid PIN");
   }
 
   const token = jwt.sign(
@@ -36,5 +36,10 @@ exports.login = async (username, pin) => {
     }
   );
 
-  return token;
+  const refreshToken = jwt.sign(
+    { id: user.id, role: user.role },
+    process.env.JWT_SECRET
+  );
+
+  return { token, refreshToken };
 };

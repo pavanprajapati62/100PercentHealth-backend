@@ -44,7 +44,7 @@ const Order = sequelize.define("order", {
     allowNull: true,
   },
   orderStatus: {
-    type: DataTypes.ENUM("Accepted", "Packed", "Dispatched", "Delivered"),
+    type: DataTypes.ENUM("Accepted", "Packed", "Collected", "Dispatched", "Delivered", "Cancelled"),
     allowNull: true,
   },
   isAccepted: {
@@ -52,6 +52,10 @@ const Order = sequelize.define("order", {
     defaultValue: false,
   },
   isPacked: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  isCollected: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
@@ -95,11 +99,19 @@ const Order = sequelize.define("order", {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  pdfPath: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   acceptTime: {
     type: DataTypes.DATE,
     allowNull: true,
   },
   packedTime: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  collectedTime: {
     type: DataTypes.DATE,
     allowNull: true,
   },
@@ -131,11 +143,65 @@ const Order = sequelize.define("order", {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  S1: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  S2: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  isOrderEdited: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  addressType: {
+    type: DataTypes.ENUM("home", "work", "other"),
+    allowNull: true,
+  },
+  premisesNoFloor: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  premisesName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  landmark: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  areaRoad: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  city: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  pincode: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  state: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  phoneNumber2: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  balanceDosagePercentage: {
+    type: DataTypes.FLOAT,
+    allowNull: true,
+  },
+  balanceDosageTime: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  }
 });
 
 Order.beforeCreate(async (order) => {
-  // const orderCount = await Order.count();
-  // const newOID = `OID${String(orderCount + 1).padStart(3, "0")}`;
   const lastOrder = await Order.findOne({
     order: [['OID', 'DESC']],
     attributes: ['OID'],
@@ -147,7 +213,7 @@ Order.beforeCreate(async (order) => {
     const lastOIDNumber = parseInt(lastOrder.OID.slice(3), 10);
     newOID = `OID${String(lastOIDNumber + 1).padStart(3, '0')}`;
   } else {
-    // First time creation, start with SID001
+    // First time creation, start with OID001
     newOID = 'OID001';
   }
 
@@ -159,11 +225,7 @@ Order.hasOne(Billing, {
   sourceKey: "OID",
   onDelete: "CASCADE",
 });
-// Order.hasOne(PatientAddress, {
-//   foreignKey: "OID",
-//   sourceKey: "OID",
-//   onDelete: "CASCADE",
-// });
+
 Order.hasOne(Invoice, {
   foreignKey: "OID",
   sourceKey: "OID",
@@ -178,7 +240,7 @@ Order.hasMany(OrderProduct, {
 OrderProduct.belongsTo(Order, { foreignKey: "OID", targetKey: "OID" });
 
 Billing.belongsTo(Order, { foreignKey: "OID", targetKey: "OID" });
-// PatientAddress.belongsTo(Order, { foreignKey: "OID", targetKey: "OID" });
+
 Invoice.belongsTo(Order, { foreignKey: "OID", targetKey: "OID" });
 
 Order.hasOne(DoctorOrderMargins, { foreignKey: 'OID', sourceKey: 'OID' });

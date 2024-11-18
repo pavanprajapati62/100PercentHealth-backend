@@ -10,6 +10,8 @@ const { Op } = require("sequelize");
 const PersonalInfo = require("../models/Doctor/PersonalInfo");
 const PatientAddress = require("../models/Order/Adress");
 const DoctorPublishRecord = require("../models/Doctor/DoctorPublishRecord");
+const DoctorOrderMargins = require("../models/Doctor/DoctorOrderMargins");
+const Invoice = require("../models/Order/Invoice");
 
 exports.adminSignUp = async (req, res) => {
   try {
@@ -41,16 +43,25 @@ exports.adminLogin = async (req, res) => {
         .send({ message: "Username and PIN are required." });
     }
 
-    const token = await authService.login(username, pin);
+    const { token, refreshToken } = await authService.login(username, pin);
 
     res.status(200).json({
       message: "Login successful",
       token,
+      refreshToken,
     });
   } catch (error) {
     res.status(401).send({ message: error.message });
   }
 };
+exports.refreshToken = async (req, res) => {
+  console.log('refreshToken', req.body);
+  res.status(200).json({
+    message: "refresh token generated successful",
+    refreshToken: req.body.refresh_token
+  });
+
+}
 
 exports.doctorLogin = async (req, res) => {
   const { contactNumber, pin } = req.body;
@@ -67,16 +78,10 @@ exports.doctorLogin = async (req, res) => {
 
     if (doctor.pin) {
       var decodedPin = jwt.verify(doctor.pin, process.env.JWT_SECRET);
-      console.log("decodedPin", decodedPin);
     }
     if (doctor.pinB) {
       var decodedPinB = jwt.verify(doctor.pinB, process.env.JWT_SECRET);
-      console.log("decodedPinB", decodedPinB);
     }
-
-    // let isMatchPin = await bcrypt.compare(pin, doctor.pin);
-
-    // let isMatchPinB = await bcrypt.compare(pin, doctor.pinB);
 
     let isMatchPinB = false;
     if (decodedPinB?.pinB === pin) {
@@ -107,9 +112,15 @@ exports.doctorLogin = async (req, res) => {
       }
     );
 
+    const refreshToken = jwt.sign(
+      { DID: doctor.DID, role: doctor.role },
+      process.env.JWT_SECRET
+    );
+
     res.status(200).json({
       message: "Login successful",
       token,
+      refreshToken,
       status: doctor.currentDoctorStatus,
       isPinB: doctor.is_pin_b,
     });
@@ -120,7 +131,7 @@ exports.doctorLogin = async (req, res) => {
 };
 
 exports.storeLogin = async (req, res) => {
-  const { username, pin } = req.body;
+  const { username, pin, fcmToken } = req.body;
 
   try {
     const store = await Store.findOne({ where: { username } });
@@ -131,12 +142,17 @@ exports.storeLogin = async (req, res) => {
     // const isMatch = await bcrypt.compare(pin, store.pin);
     let isMatch = false;
     const decodedPin = jwt.verify(store.pin, process.env.JWT_SECRET);
-    //console.log("decodedPin========", decodedPin);
     if (decodedPin.pin === pin) {
       isMatch = true;
     }
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid PIN" });
+    }
+
+    if (!store.fcmToken.includes(fcmToken)) {
+      store.fcmToken.push(fcmToken);
+      store.changed('fcmToken', true);
+      await store.save();
     }
 
     store.currentStoreStatus = "ACTIVE";
@@ -150,9 +166,15 @@ exports.storeLogin = async (req, res) => {
       }
     );
 
+    const refreshToken = jwt.sign(
+      { SID: store.SID, role: store.role },
+      process.env.JWT_SECRET
+    );
+
     res.status(200).json({
       message: "Login successful",
       token,
+      refreshToken,
       status: store.currentStoreStatus,
     });
   } catch (error) {
@@ -194,6 +216,8 @@ exports.searchOrderData = async (req, res) => {
         include: [
           { model: Doctor, include: [{ model: PersonalInfo }] },
           { model: PatientDetails },
+          { model: DoctorOrderMargins },
+          { model: Invoice }
         ],
         order: [["createdAt", "DESC"]],
         distinct: true,
@@ -212,13 +236,10 @@ exports.searchOrderData = async (req, res) => {
           },
         },
         include: [
-          {
-            model: Doctor,
-            include: [{ model: PersonalInfo }],
-          },
-          {
-            model: PatientDetails,
-          },
+          { model: Doctor, include: [{ model: PersonalInfo }] },
+          { model: PatientDetails },
+          { model: DoctorOrderMargins },
+          { model: Invoice }
         ],
         order: [["createdAt", "DESC"]],
         distinct: true,
@@ -230,17 +251,17 @@ exports.searchOrderData = async (req, res) => {
     }
 
     if (searchQuery.startsWith("PID")) {
-      const patientResult = await PatientDetails.findAndCountAll({
+      const patientResult = await Order.findAndCountAll({
         where: {
           PID: {
             [Op.iLike]: `%${searchQuery}%`,
           },
         },
         include: [
-          {
-            model: Doctor,
-            include: [{ model: PersonalInfo }],
-          },
+          { model: Doctor, include: [{ model: PersonalInfo }] },
+          { model: PatientDetails },
+          { model: DoctorOrderMargins },
+          { model: Invoice }
         ],
         order: [["createdAt", "DESC"]],
         distinct: true,
@@ -262,6 +283,7 @@ exports.searchOrderData = async (req, res) => {
   }
 };
 
+// Need to change
 exports.searchCustomerData = async (req, res) => {
   const searchQuery = req.query.search;
   const page = parseInt(req.query.page) || 1;
@@ -293,6 +315,7 @@ exports.searchCustomerData = async (req, res) => {
           },
           include: [{ model: PatientAddress }, { model: Order }],
           order: [["createdAt", "DESC"]],
+          distinct: true,
           limit,
           offset,
         });
@@ -370,6 +393,7 @@ exports.getAllPatients = async (req, res) => {
         ],
       },
       include: [{ model: Order }, { model: PatientAddress }],
+      distinct: true,
       order: [["createdAt", "DESC"]],
       limit,
       offset,
@@ -392,9 +416,9 @@ exports.getAllPatients = async (req, res) => {
 
 exports.publishRecord = async (req, res) => {
   try {
-    await DoctorPublishRecord.create(req.body);
+    const data = await DoctorPublishRecord.create(req.body);
 
-    res.status(200).json({ message: "Record published successfully" });
+    res.status(200).json({ message: "Record published successfully", data: data });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });
@@ -408,6 +432,25 @@ exports.getAllPublishRecords = async (req, res) => {
     res.status(200).json(records);
   } catch (error) {
     console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+exports.updatePublishRecord = async (req, res) => {
+  try {
+    const id = req.params.id;
+    let publishRecord = await DoctorPublishRecord.findOne({
+      where: { id: id },
+    });
+
+    if(!publishRecord) {
+      throw new Error("Publish record not found")
+    }
+
+    await publishRecord.update(req.body);
+
+    res.status(200).json({ message: "Publish record updated successfully" });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 }

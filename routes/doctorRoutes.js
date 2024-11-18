@@ -41,7 +41,7 @@ router.put("/:id", [verifyToken, isAdminOrDoctor], updateDoctor);
 router.delete("/:id", [verifyToken, isAdmin], deleteDoctor);
 router.patch("/update-doctor-status", [verifyToken, isDoctor], updateDoctorStatus);
 router.post("/add-products-frequent", [verifyToken, isDoctor], addProductsToFrequent);
-router.post("/create-pdf", [verifyToken, isDoctor], createPdf);
+router.post("/create-pdf", [verifyToken, isStoreOrDoctor], createPdf);
 router.delete("/remove-products-frequent/:id", [verifyToken, isDoctor], removeFrequentProduct)
 
 module.exports = router;

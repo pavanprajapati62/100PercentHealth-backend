@@ -12,7 +12,7 @@ const EmailInfo = sequelize.define("emailInfo", {
   },
   doctorEmail: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
     validate: {
       isEmail: true,
     },

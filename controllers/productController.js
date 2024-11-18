@@ -63,7 +63,7 @@ exports.createProduct = async (req, res) => {
     const storeProductEntries = storeQty.map((store) => ({
       IID: product.IID,
       SID: store.storeId,
-      productName: product.productName,
+      // productName: product.productName,
       storeStock: store.Qty,
       units: product.uom,
     }));
@@ -131,6 +131,7 @@ exports.getProductById = async (req, res) => {
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
   const { marginPercentage, units, storeQty, ...updatedData } = req.body;
+  console.log("updatedData================", updatedData)
 
   try {
     const product = await Product.findOne({
@@ -163,7 +164,18 @@ exports.updateProduct = async (req, res) => {
       }
     }
 
+    let totalStoreStockBefore = 0;
+    const storeProducts = await StoreProduct.findAll({
+      where: { IID: id }
+    })
+    if (storeProducts.length > 0) {
+      totalStoreStockBefore = storeProducts?.reduce((acc, storeProduct) => acc + storeProduct.storeStock, 0);
+    }
+    console.log("totalStoreStockBefore=====", totalStoreStockBefore)
+
     if (storeQty) {
+      // const updatedStoreQty = [...product?.storeQty];
+      // console.log("updatedStoreQty=====", updatedStoreQty)
       for (const { storeId, Qty } of storeQty) {
         const [storeProduct, created] = await StoreProduct.findOrCreate({
           where: { IID: id, SID: storeId },
@@ -171,14 +183,48 @@ exports.updateProduct = async (req, res) => {
             IID: id,
             SID: storeId,
             storeStock: Qty,
+            units: product.uom
           },
         });
+        // console.log("storeProduct======", storeProduct)
 
         if (!created) {
           // If it already exists, update the stock quantity
           await storeProduct.update({ storeStock: Qty });
         }
+
+        // const existingStoreIndex = updatedStoreQty?.findIndex(item => { 
+        //   return item.storeId === storeId;
+        // });
+        // if (existingStoreIndex >= 0) {
+        //   updatedStoreQty[existingStoreIndex].Qty = Qty; 
+        // } else {
+        //   updatedStoreQty.push({ storeId, Qty }); 
+        // }
       }
+      let totalStoreStockAfter = 0;
+      const storeProductsAfter = await StoreProduct.findAll({
+        where: { IID: id },
+      });
+  
+      if (storeProductsAfter.length > 0) {
+        totalStoreStockAfter = storeProductsAfter.reduce(
+          (acc, storeProduct) => acc + storeProduct.storeStock,
+          0
+        );
+      }
+      console.log("totalStoreStockAfter====", totalStoreStockAfter);
+      const stockDifference = totalStoreStockAfter - totalStoreStockBefore;
+      if (stockDifference > 0) {
+        // If total store stock after update is greater, subtract from productStock
+        await product.update({
+          productStock: product.productStock - stockDifference,
+        });
+      }
+      // console.log("updatedStoreQty=======================", updatedStoreQty)
+      // product.storeQty = updatedStoreQty;
+      // product.changed('storeQty', true);
+      // await product.save();
     }
 
     res.status(200).json({ message: "Product updated successfully", product });
@@ -213,7 +259,7 @@ exports.searchProduct = async (req, res) => {
       where: {
         [Op.or]: [{ productName: { [Op.iLike]: `%${searchQuery}%` } }],
       },
-      include: [{ model: ProductMargin }],
+      include: [{ model: ProductMargin }, { model: StoreProduct }],
       order: [["createdAt", "DESC"]],
     });
 

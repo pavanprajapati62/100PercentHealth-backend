@@ -16,6 +16,35 @@ const StoreProduct = require("../models/Product/StoreProduct");
 const Store = require("../models/Store/Store");
 const { cloudinaryUploadImage } = require("../utils/cloudinary");
 const moment = require("moment");
+const { admin, sendNotification } = require("../config/firebase");
+
+const filterOrdersByDosageAndTimeFrame = async (orders) => {
+  try {
+    if (!orders?.orderProducts || orders.orderProducts.length === 0) {
+      return 0; 
+    }
+
+    // Calculate balanceDosagePercentage for each product
+    const percentages = orders.orderProducts.map((product) => {
+      const balanceUnits = parseFloat(product.balanceUnits) || 0;
+      const rxUnits = parseFloat(product.rxUnits) || 1; // Avoid division by zero
+
+      // Calculate balanceDosagePercentage
+      const percentage = (balanceUnits / rxUnits) * 100;
+
+      return percentage;
+    });
+    console.log("percentages============", percentages)
+
+    // Return the minimum balanceDosagePercentage
+    const minPercentage = Math.min(...percentages);
+    console.log("minPercentage====", minPercentage)
+    
+    return minPercentage.toFixed(2);
+  } catch (error) {
+    throw new Error(error);
+  }
+};
 
 exports.createOrder = async (req, res) => {
   try {
@@ -29,6 +58,7 @@ exports.createOrder = async (req, res) => {
       prescription,
       DID,
       filePath,
+      pdfPath,
     } = req.body;
 
     if (id.startsWith("DID")) {
@@ -53,14 +83,12 @@ exports.createOrder = async (req, res) => {
     if (!store) {
       return res.status(404).json({ message: "Store not found" });
     }
-    console.log("doctor.DID====================", doctor.DID)
 
     let patientDetails = await PatientDetails.findOne({
       where: { phoneNumber: patient?.phoneNumber },
     });
 
     if (!patientDetails) {
-      // Create new patient details if not found
       patientDetails = await PatientDetails.create({
         ...patient,
         DID: doctor.DID,
@@ -78,7 +106,19 @@ exports.createOrder = async (req, res) => {
       SID: store.SID,
       DID: doctor.DID,
       filePath: filePath || "",
+      pdfPath: pdfPath || "",
       PID,
+      addressType: delivery?.isAddress ? delivery?.address?.addressType : null,
+      premisesNoFloor: delivery?.isAddress
+        ? delivery?.address?.premisesNoFloor
+        : "",
+      premisesName: delivery?.isAddress ? delivery?.address?.premisesName : "",
+      landmark: delivery?.isAddress ? delivery?.address?.landmark : "",
+      areaRoad: delivery?.isAddress ? delivery?.address?.areaRoad : "",
+      city: delivery?.isAddress ? delivery?.address?.city : "",
+      pincode: delivery?.isAddress ? delivery?.address?.pincode : "",
+      state: delivery?.isAddress ? delivery?.address?.state : "",
+      phoneNumber2: delivery?.isAddress ? delivery?.address?.phoneNumber2 : "",
     });
     const orderOID = order.OID;
 
@@ -89,7 +129,7 @@ exports.createOrder = async (req, res) => {
     await Billing.create({ ...billing, OID: orderOID });
 
     let patientAddress = await PatientAddress.findOne({
-      where: { PID: PID }, // Change this to your specific logic if needed
+      where: { PID: PID },
     });
 
     if (patientAddress) {
@@ -115,7 +155,24 @@ exports.createOrder = async (req, res) => {
       await Promise.all(productPromises);
     }
 
-    res.status(201).json({ message: order });
+    const orderData = await Order.findOne({
+      where: { OID: orderOID },
+      include: [OrderProduct],
+    });
+    const data = orderData.get({ plain: true });
+    const percentage = await filterOrdersByDosageAndTimeFrame(data);
+    console.log("percentage===", percentage)
+    await orderData.update({ balanceDosagePercentage: percentage});
+
+    const tokens = store?.fcmToken; // Get the fcmTokens of the store
+    const notificationMessage = {
+      title: "New Order Created",
+      body: `Order with ID ${orderOID} has been successfully created.`,
+    };
+
+    await sendNotification(tokens, notificationMessage);
+
+    res.status(201).json({ message: orderData });
   } catch (err) {
     res.status(500).json({ error: err });
   }
@@ -127,16 +184,6 @@ exports.uploadImage = async (req, res) => {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // const ipAddress = "192.168.0.121"; // Replace with your local machine's IP
-    // const port = 5000; // Make sure this matches your server's port
-
-    // console.log("req.file.filename==============", req.file.filename);
-    // // const fileUrl = `http://${ipAddress}:${port}/public/images/${req.file.filename}`;
-
-    // const fileUrl = `https://health100.manageprojects.in/public/images/${req.file.filename}`;
-    // console.log("fileUrl=============",fileUrl)
-
-    // const fileUrl1 = `/var/www/100PercentHealth-backend/public/images/${req.file.filename}`;
     var locaFilePath = req?.file?.path;
     if (locaFilePath) {
       var result = await cloudinaryUploadImage(locaFilePath);
@@ -165,6 +212,7 @@ exports.getOrderById = async (req, res) => {
   }
 };
 
+// This function is used to get orders on admin panel list
 exports.getAllOrders = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -183,7 +231,7 @@ exports.getAllOrders = async (req, res) => {
       whereClause.isAddress = true;
     }
 
-    const { count, rows: orders } = await Order.findAndCountAll({
+    const data = await Order.findAndCountAll({
       where: whereClause,
       include: [
         PatientDetails,
@@ -203,8 +251,10 @@ exports.getAllOrders = async (req, res) => {
             },
           ],
         },
-        Invoice
+        Invoice,
+        DoctorOrderMargins,
       ],
+      distinct: true,
       limit,
       offset,
       order: [["createdAt", "DESC"]],
@@ -212,9 +262,9 @@ exports.getAllOrders = async (req, res) => {
     res.status(200).json({
       currentPage: page,
       limit,
-      totalItems: count,
-      totalPages: Math.ceil(count / limit),
-      orders,
+      totalItems: data?.count,
+      totalPages: Math.ceil(data?.count / limit),
+      orders: data?.rows,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -224,6 +274,8 @@ exports.getAllOrders = async (req, res) => {
 exports.updateOrder = async (req, res) => {
   try {
     const OID = req?.params?.id;
+    const id = req.userId;
+
     const {
       patient,
       products,
@@ -232,11 +284,16 @@ exports.updateOrder = async (req, res) => {
       payment,
       prescription,
       invoice,
+      filePath,
+      pdfPath
     } = req.body;
 
     const order = await Order.findOne({
       where: { OID },
+      include: [OrderProduct]
     });
+    const dataOrder = await order.get({plain: true});
+    console.log("dataOrder=======", dataOrder)
 
     if (!order) return res.status(404).json({ error: "Order not found" });
 
@@ -249,33 +306,100 @@ exports.updateOrder = async (req, res) => {
       isCollect: delivery.isCollect || false,
       isAddress: delivery.isAddress || false,
       prescription: updatedPrescription,
+      filePath: filePath || "",
+      pdfPath: pdfPath || "",
     });
 
-    await PatientDetails.update(patient, { where: { OID } });
-    await Billing.update(billing, { where: { OID } });
-
-    if (delivery.isClinic || delivery.isCollect) {
-      await PatientAddress.destroy({ where: { OID } });
-    } else if (delivery.isAddress && delivery.address) {
-      await PatientAddress.update(delivery.address, { where: { OID } });
-    }
-
-    if (products && products.length > 0) {
-      for (const product of products) {
-        const { productId, ...productDetails } = product;
-        console.log("productId", productId);
-        await OrderProduct.update(productDetails, {
-          where: { IID: productId, OID },
+    if (id) {
+      if (id.startsWith("SID")) {
+        await order.update({
+          isOrderEdited: true,
         });
       }
     }
 
-    if (invoice) {
-      await Invoice.create({
-        invoiceNo: invoice.invoiceNo,
-        invoiceAmount: invoice.invoiceAmount,
-        OID: OID,
+    if (patient) {
+      var patientDetail = await PatientDetails.findOne({
+        where: { phoneNumber: patient?.phoneNumber },
       });
+      if (patientDetail) {
+        await PatientDetails.update(patient, {
+          where: { PID: patientDetail?.PID },
+        });
+      }
+    }
+
+    await Billing.update(billing, { where: { OID } });
+
+    if (delivery.isAddress && delivery.address) {
+      const patientAddress = await PatientAddress.findOne({
+        where: { PID: patientDetail?.PID },
+      });
+      if (patientAddress) {
+        await PatientAddress.update(delivery.address, {
+          where: { PID: patientDetail?.PID },
+        });
+      } else {
+        await PatientAddress.create({
+          ...delivery.address,
+          PID: patientDetail?.PID,
+        });
+      }
+
+      await order.update({
+        addressType: delivery?.isAddress ? delivery?.address?.addressType : null,
+        premisesNoFloor: delivery?.isAddress ? delivery?.address?.premisesNoFloor : "",
+        premisesName: delivery?.isAddress ? delivery?.address?.premisesName : "",
+        landmark: delivery?.isAddress ? delivery?.address?.landmark : "",
+        areaRoad: delivery?.isAddress ? delivery?.address?.areaRoad : "",
+        city: delivery?.isAddress ? delivery?.address?.city : "",
+        pincode: delivery?.isAddress ? delivery?.address?.pincode : "",
+        state: delivery?.isAddress ? delivery?.address?.state : "",
+        phoneNumber2: delivery?.isAddress ? delivery?.address?.phoneNumber2 : "",
+      })
+    }
+
+    if (products && products.length > 0) {
+
+      const existingProducts = dataOrder?.orderProducts;
+      for (const existingProduct of existingProducts) {
+        const productInPayload = products.find((product) => {
+          return product.productId === existingProduct.IID;
+        });
+
+        if (!productInPayload) {
+          await OrderProduct.destroy({
+            where: { id: existingProduct.id, OID: OID }
+          });
+        }
+      }
+
+      for (const product of products) {
+        const { productId, ...productDetails } = product;
+        const existingProduct = await OrderProduct.findOne({
+          where: { IID: productId, OID },
+        });
+
+        if (existingProduct) {
+          await existingProduct.update(productDetails);
+        } else {
+          await OrderProduct.create({
+            OID,
+            IID: productId,
+            SID: order?.SID,
+            ...productDetails,
+          });
+        }
+      }
+
+      const orderData = await Order.findOne({
+        where: { OID: OID },
+        include: [OrderProduct],
+      });
+      const data = orderData.get({ plain: true });
+
+      const percentage = await filterOrdersByDosageAndTimeFrame(data);
+      console.log("percentage=====", percentage)
     }
 
     res.status(200).json({ message: "Order updated successfully" });
@@ -347,7 +471,7 @@ const getDoctorMargin = async (orderId, doctorId, orderProducts) => {
 
 exports.updateOrderStatus = async (req, res) => {
   const OID = req.params.id;
-  const { isAccepted, isPacked, isDispatched, isDelivered } = req.body;
+  const { isAccepted, isPacked, isCollected, isDispatched, isDelivered, invoice } = req.body;
 
   try {
     const order = await Order.findOne({
@@ -360,7 +484,7 @@ exports.updateOrderStatus = async (req, res) => {
     }
     const orderData = order.get({ plain: true });
 
-    let invoiceData = null;
+    let invoiceData = await Invoice.findOne({ where: { OID } });
 
     if (isAccepted) {
       for (let i = 0; i < orderData.orderProducts.length; i++) {
@@ -390,7 +514,6 @@ exports.updateOrderStatus = async (req, res) => {
                 .status(404)
                 .json({ message: "Store Product not found" });
             }
-            console.log("storeProduct==================", storeProduct);
             const newStock = storeProduct.storeStock - orderQty;
 
             await storeProduct.update(
@@ -407,35 +530,6 @@ exports.updateOrderStatus = async (req, res) => {
       order.orderStatus = "Accepted";
       order.acceptTime = new Date();
 
-      const { payableAmount } = await Billing.findOne({
-        where: { OID: OID },
-      });
-
-      // const invoiceCount = await Invoice.count();
-      // const newIVID = `IVID${String(invoiceCount + 1).padStart(3, "0")}`;
-
-      const lastInvoice = await Invoice.findOne({
-        order: [["IVID", "DESC"]],
-        attributes: ["IVID"],
-      });
-
-      let newIVID;
-
-      if (lastInvoice && lastInvoice.IVID) {
-        const lastIVIDNumber = parseInt(lastInvoice.IVID.slice(4), 10);
-        newIVID = `IVID${String(lastIVIDNumber + 1).padStart(3, "0")}`;
-      } else {
-        // First time creation, start with IVID001
-        newIVID = "IVID001";
-      }
-
-      invoiceData = await Invoice.create({
-        IVID: newIVID,
-        OID,
-        invoiceNo: newIVID,
-        invoiceAmount: payableAmount,
-      });
-
       var doctorMargin = await getDoctorMargin(
         orderData.OID,
         orderData.DID,
@@ -447,54 +541,140 @@ exports.updateOrderStatus = async (req, res) => {
       order.orderStatus = "Packed";
       order.packedTime = new Date();
 
-      const duration = moment.duration(moment(order.packedTime).diff(moment(order.acceptTime)));
-      order.QP = `${duration.days()} days ${duration.hours()} hours ${duration.minutes()} minutes`;
+      if(order?.isCollect === true) {
+        console.log("11111111111111111111111111111111111111111111111111111111111111111111111")
+        const duration = moment.duration(
+          moment(order.packedTime).diff(moment(order.acceptTime))
+        );
+        const hours = duration.asHours().toFixed(0);
+        const minutes = duration.minutes();
+        order.S1 = `${hours} hours ${minutes} minutes`;
+        order.QP = `${hours} hours ${minutes} minutes`;
+      }
+
+      if (invoice && !invoiceData) {
+        invoiceData = await Invoice.create({
+          invoiceNo: invoice?.invoiceNo,
+          invoiceAmount: invoice?.invoiceAmount,
+          paymentType: invoice?.paymentType,
+          OID: OID,
+        });
+      }
+    }
+    if(isCollected) {
+      order.isCollected = true;
+      order.orderStatus = "Collected";
+      order.collectedTime = new Date();
+
+      let balanceDosageTime;
+      const currentDate = moment(); 
+      if (order.balanceDosagePercentage === 100) {
+        // Set to 1 week
+        balanceDosageTime = currentDate.add(1, 'week').toDate();
+      } else if (order.balanceDosagePercentage < 100) {
+        // Set to 1 month
+        balanceDosageTime = currentDate.add(1, 'month').toDate();
+      }
+      order.balanceDosageTime = balanceDosageTime;
     }
     if (isDispatched) {
       order.isDispatched = true;
       order.orderStatus = "Dispatched";
       order.dispatchTime = new Date();
 
-      const duration = moment.duration(moment(order.dispatchTime).diff(moment(order.acceptTime)));
-      order.QD = `${duration.days()} days ${duration.hours()} hours ${duration.minutes()} minutes`;
+      if(order?.isClinic === true || order?.isAddress === true) {
+        const duration = moment.duration(
+          moment(order.dispatchTime).diff(moment(order.acceptTime))
+        );
+        const hours = duration.asHours().toFixed(0);
+        const minutes = duration.minutes();
+        order.S1 = `${hours} hours ${minutes} minutes`;
+      }
+
+      const duration = moment.duration(
+        moment(order.dispatchTime).diff(moment(order.acceptTime))
+      );
+      const hours = duration.asHours().toFixed(0);
+      const minutes = duration.minutes();
+      order.QD = `${hours} hours ${minutes} minutes`;
     }
     if (isDelivered) {
+      console.log("order===", order)
       order.isDelivered = true;
       order.orderStatus = "Delivered";
       order.deliveredTime = new Date();
 
-      if (order.packedTime) {
-        // Calculate PC (Packed to Delivered Time)
-        const duration = moment.duration(moment(order.deliveredTime).diff(moment(order.packedTime)));
-        order.PC = `${duration.days()} days ${duration.hours()} hours ${duration.minutes()} minutes`;
+      if(order?.isClinic === true || order?.isAddress === true) {
+        const duration = moment.duration(
+          moment(order.deliveredTime).diff(moment(order.dispatchTime))
+        );
+        const hours = duration.asHours().toFixed(0);
+        const minutes = duration.minutes();
+        order.S2 = `${hours} hours ${minutes} minutes`;
+      } else if(order?.isCollect === true) {
+        const duration = moment.duration(
+          moment(order.collectedTime).diff(moment(order.packedTime))
+        );
+        const hours = duration.asHours().toFixed(0);
+        const minutes = duration.minutes();
+        order.S2 = `${hours} hours ${minutes} minutes`;
+        order.PC = `${hours} hours ${minutes} minutes`; // Calculate PC (Packed to Delivered Time)
       }
+
+      let balanceDosageTime;
+      const currentDate = moment(); 
+      if (order.balanceDosagePercentage === 100) {
+        // Set to 1 week
+        balanceDosageTime = currentDate.add(1, 'week').toDate();
+      } else if (order.balanceDosagePercentage < 100) {
+        // Set to 1 month
+        balanceDosageTime = currentDate.add(1, 'month').toDate();
+      }
+      order.balanceDosageTime = balanceDosageTime;
 
       if (order.dispatchTime) {
         // Calculate DC (Dispatch to Delivered Time)
-        const duration = moment.duration(moment(order.deliveredTime).diff(moment(order.dispatchTime)));
-        order.DC = `${duration.days()} days ${duration.hours()} hours ${duration.minutes()} minutes`;
+        const duration = moment.duration(
+          moment(order.deliveredTime).diff(moment(order.dispatchTime))
+        );
+        const hours = duration.asHours().toFixed(0);
+        const minutes = duration.minutes();
+        order.DC = `${hours} hours ${minutes} minutes`;
       }
 
       if (order.acceptTime) {
         // Calculate ET (Accept to Delivered Time)
-        const duration = moment.duration(moment(order.deliveredTime).diff(moment(order.acceptTime)));
-        order.ET = `${duration.days()} days ${duration.hours()} hours ${duration.minutes()} minutes`;
+        const duration = moment.duration(
+          moment(order.deliveredTime).diff(moment(order.acceptTime))
+        );
+        const hours = duration.asHours().toFixed(0);
+        const minutes = duration.minutes();
+        order.ET = `${hours} hours ${minutes} minutes`;
       }
     }
 
     await order.save();
 
-    if (invoiceData !== null) {
-      return res.status(200).json({
-        message: "Order status updated and invoice created successfully",
-        invoiceData,
-        doctorMargin,
-      });
-    } else {
-      return res
-        .status(200)
-        .json({ message: "Order status updated successfully" });
-    }
+    // if (invoiceData !== null) {
+    //   return res.status(200).json({
+    //     message: "Order status updated and invoice created successfully",
+    //     invoiceData,
+    //   });
+    // } else {
+    //   return res
+    //     .status(200)
+    //     .json({ message: "Order status updated successfully" });
+    // }
+    const responseData = {
+      message: "Order status updated successfully",
+      invoiceData: invoiceData || null,
+      QD: order.QD,
+      DC: order.DC,
+      QP: order.QP,
+      PC: order.PC,
+    };
+
+    return res.status(200).json(responseData);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -516,7 +696,7 @@ exports.cancelOrder = async (req, res) => {
     order.isDispatched = false;
     order.isDelivered = false;
     order.isCancelled = true;
-    order.orderStatus = null;
+    order.orderStatus = "Cancelled";
     if (cancelReason) {
       order.cancelReason = cancelReason;
     }
@@ -534,7 +714,7 @@ exports.getPatientByID = async (req, res) => {
     const patientID = req.params.id;
     const patient = await PatientDetails.findOne({
       where: { PID: patientID },
-      include: [{ model: PatientAddress }, {model: Order}],
+      include: [{ model: PatientAddress }, { model: Order }],
     });
 
     if (!patient) {
@@ -542,7 +722,7 @@ exports.getPatientByID = async (req, res) => {
     }
 
     res.status(200).json(patient);
-  } catch(error) {
+  } catch (error) {
     return res.status(500).json({ error: error.message });
   }
-}
+};

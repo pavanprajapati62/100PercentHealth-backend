@@ -39,6 +39,10 @@ const Store = sequelize.define("store", {
     allowNull: true,
     defaultValue: "CLOSED",
   },
+  fcmToken: {
+    type: DataTypes.JSONB, 
+    defaultValue: [],
+  }
 });
 
 Store.beforeCreate(async (store) => {
