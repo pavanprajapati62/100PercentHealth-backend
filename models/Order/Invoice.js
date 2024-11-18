@@ -24,13 +24,29 @@ const Invoice = sequelize.define("invoice", {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  paymentType: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 });
 
-// Invoice.beforeCreate(async (invoice) => {
-//   const invoiceCount = await Invoice.count();
-//   const newIVID = `IVID${String(invoiceCount + 1).padStart(3, "0")}`;
+Invoice.beforeCreate(async (invoice) => {
+  const lastInvoice = await Invoice.findOne({
+    order: [["IVID", "DESC"]],
+    attributes: ["IVID"],
+  });
 
-//   invoice.invoiceNo = newIVID;
-// });
+  let newIVID;
+
+  if (lastInvoice && lastInvoice.IVID) {
+    const lastIVIDNumber = parseInt(lastInvoice.IVID.slice(4), 10);
+    newIVID = `IVID${String(lastIVIDNumber + 1).padStart(3, "0")}`;
+  } else {
+    // First time creation, start with IVID001
+    newIVID = "IVID001";
+  }
+
+  invoice.IVID = newIVID;
+});
 
 module.exports = Invoice;

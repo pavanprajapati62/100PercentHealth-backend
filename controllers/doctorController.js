@@ -25,13 +25,13 @@ const { generateHTML } = require("../pdf/htmlTemplate");
 const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 const DoctorPublishRecord = require("../models/Doctor/DoctorPublishRecord");
+const Invoice = require("../models/Order/Invoice");
 
 cloudinary.config({
   cloud_name: "dsp7l7i4e",
   api_key: "478458651528647",
   api_secret: "Z1qVxAqDzs51O_A9oTcUKi-DJD4",
 });
-// require("../temp/temp.pdf")
 
 exports.createDoctor = async (req, res) => {
   try {
@@ -111,7 +111,6 @@ exports.getDoctorById = async (req, res) => {
         Order,
       ],
     });
-    console.log("doctor", doctor.pin);
     try {
       const decodedPin = jwt.verify(doctor.pin, process.env.JWT_SECRET);
       plainPin = decodedPin?.pin;
@@ -215,6 +214,7 @@ exports.searchDoctor = async (req, res) => {
             [Op.or]: [
               { name: { [Op.iLike]: `%${searchQuery}%` } },
               { surname: { [Op.iLike]: `%${searchQuery}%` } },
+              { DID: { [Op.iLike]: `%${searchQuery}%` } },
             ],
           },
         },
@@ -269,7 +269,7 @@ exports.getDoctorDetail = async (req, res) => {
   try {
     const doctor = await Doctor.findOne({
       where: { DID: DID },
-      include: [PersonalInfo],
+      include: [PersonalInfo, Store],
     });
 
     if (!doctor) {
@@ -448,12 +448,14 @@ exports.getAllOrdersOfDoctor = async (req, res) => {
       whereClause.isAddress = true;
     }
 
+    console.log("whereClause===", whereClause)
+
     const { count, rows: orders } = await Order.findAndCountAll({
       where: whereClause,
       include: [
         PatientDetails,
         Billing,
-        // PatientAddress,
+        Invoice,
         OrderProduct,
         {
           model: Doctor,
@@ -469,6 +471,7 @@ exports.getAllOrdersOfDoctor = async (req, res) => {
           ],
         },
       ],
+      distinct: true,
       limit,
       offset,
       order: [["createdAt", "DESC"]],
@@ -486,9 +489,15 @@ exports.getAllOrdersOfDoctor = async (req, res) => {
 };
 
 exports.createPdf = async (req, res) => {
-  try {
+  try { 
     const data = req.body;
-    const htmlContent = generateHTML(data);
+
+    const doctor = await Doctor.findOne({ 
+      where: { DID: data?.DID },
+      include: [ PersonalInfo, ClinicAddress ] 
+    });
+
+    const htmlContent = generateHTML(data, doctor);
 
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
@@ -527,6 +536,7 @@ exports.getPublishRecordForDoctor = async (req, res) => {
     const DID = req.params.id;
     const record = await DoctorPublishRecord.findAll({
       where: { DID: DID },
+      order: [["createdAt", "DESC"]],
     });
 
     res.status(200).json(record || []);

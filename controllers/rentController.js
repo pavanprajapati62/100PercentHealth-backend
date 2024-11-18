@@ -18,7 +18,9 @@ async function generateMonthlyRent() {
   try {
     const currentMonth = moment().month();
     const currentYear = moment().year();
+    console.log("currentYear===", currentYear)
     const previousMonthName = moment().subtract(1, "month").format("MMMM");
+    console.log("previousMonthName===", previousMonthName)
 
     // 1. Get start and end dates for the previous month
     const startOfPreviousMonth = moment()
@@ -29,6 +31,9 @@ async function generateMonthlyRent() {
       .subtract(1, "month")
       .endOf("month")
       .toDate();
+
+    console.log("startOfPreviousMonth====", startOfPreviousMonth)
+    console.log("endOfPreviousMonth====", endOfPreviousMonth)
 
     // 2. Fetch orders from DoctorOrderMargins with isDelivered=true from previous month
     const doctorMargins = await DoctorOrderMargins.findAll({
@@ -60,6 +65,8 @@ async function generateMonthlyRent() {
       group: ["doctorOrderMargin.DID"], 
     });
 
+    // console.log("doctorMargins=====", doctorMargins)
+
     // 3. Fetch previously undelivered orders that are now delivered from PendingDoctorMargins
     const pendingMargins = await PendingDoctorMargin.findAll({
       include: [
@@ -69,6 +76,8 @@ async function generateMonthlyRent() {
         },
       ],
     });
+
+    // console.log("pendingMargins=====", pendingMargins)
 
     // 4. Create rent entries for both DoctorOrderMargins and PendingDoctorMargins data
     const rentData = {};
@@ -96,6 +105,7 @@ async function generateMonthlyRent() {
       await PendingDoctorMargin.destroy({ where: { DID, OID } });
     }
 
+    // console.log("rentData=====", rentData)
     // 5. Create DoctorRent entries based on combined data
     const rentPromises = Object.entries(rentData).map(([DID, data]) =>
       DoctorRent.create({
@@ -138,6 +148,7 @@ async function generateMonthlyRent() {
   }
 }
 
+// Not in use
 async function getRent(req, res) {
   const doctorMargins = await DoctorOrderMargins.findAll({
     attributes: [
@@ -162,6 +173,7 @@ async function getRent(req, res) {
   res.status(200).json({ message: doctorMargins });
 }
 
+// This function is used to get doctor on publish select year and month
 async function getRentOfDoctor(req, res) {
   try {
     const DID = req.params.id;
@@ -192,7 +204,7 @@ async function getRentOfDoctor(req, res) {
   }
 }
 
-// This function will return the orders of doctor for specefic month and year
+// This function will return the orders of doctor for specefic month and year on admin panel when click on open report
 async function getOrdersOfDoctor(req, res) {
   try {
     const monthMapping = {
@@ -214,7 +226,6 @@ async function getOrdersOfDoctor(req, res) {
     const { month, year } = req.body;
 
     const monthNumber = monthMapping[month];
-    console.log("monthNumber=========================", monthNumber);
     if (monthNumber === undefined) {
       return res.status(400).json({ error: "Invalid month provided" });
     }
@@ -233,13 +244,17 @@ async function getOrdersOfDoctor(req, res) {
     //     Sequelize.fn('EXTRACT', 'YEAR', Sequelize.col('createdAt')) == year,
     //   ],
     // };
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
-    const orders = await Order.findAll({
+    const orders = await Order.findAndCountAll({
       where: {
         DID: DID,
         createdAt: {
           [Op.between]: [startDate, endDate],
         },
+        orderStatus: "Delivered"
       },
       include: [
         {
@@ -260,17 +275,40 @@ async function getOrdersOfDoctor(req, res) {
           include: [PersonalInfo, AccountCategory, PaymentDetails],
         },
         {
-          model: DoctorOrderMargins, // Include DoctorOrderMargins to fetch marginPercentage
-          attributes: ["marginPercentage"], // Only select marginPercentage to avoid fetching unnecessary data
+          model: DoctorOrderMargins, 
+          attributes: ["marginPercentage"], 
         },
       ],
+      order: [["createdAt", "DESC"]],
+      distinct: true,
+      limit,
+      offset,
     });
 
-    // if(!doctorRent) {
-    //   return res.status(404).json({ error: "No Record Found" })
-    // }
+    const marginOrders = await Order.findAll({
+      where: {
+        DID: DID,
+        createdAt: {
+          [Op.between]: [startDate, endDate],
+        },
+        orderStatus: "Delivered"
+      },
+      include: [{ model: DoctorOrderMargins, attributes: ["marginPercentage"] }]
+    });
+
+    const totalMarginPercentage = marginOrders?.filter(order => order.doctorOrderMargin !== null).reduce((sum, order) => sum + order.doctorOrderMargin.marginPercentage, 0);
+    console.log("Total Margin Percentage:", totalMarginPercentage);
+    const formattedTotalMarginPercentage = parseFloat(totalMarginPercentage.toFixed(2));
+    
     res.status(200).json({
-      data: orders,
+      currentPage: page,
+      limit,
+      totalItems: orders?.count,
+      totalPages: Math.ceil(orders?.count / limit),
+      totalMarginPercentage: formattedTotalMarginPercentage,
+      month: month,
+      year: year,
+      data: orders?.rows,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

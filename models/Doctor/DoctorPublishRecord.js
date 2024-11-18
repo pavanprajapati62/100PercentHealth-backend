@@ -44,8 +44,12 @@ const DoctorPublishRecord = sequelize.define("doctorPublishRecord", {
     allowNull: false,
   },
   trxId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.STRING,
     allowNull: false,
+  },
+  isPublish: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
   },
 });
 

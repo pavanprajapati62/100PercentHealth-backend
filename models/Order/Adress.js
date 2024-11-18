@@ -50,9 +50,9 @@ const PatientAddress = sequelize.define("patientAddress", {
     type: DataTypes.STRING,
     allowNull: true,
   },
-  phoneNumber: {
+  phoneNumber2: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
 });
 

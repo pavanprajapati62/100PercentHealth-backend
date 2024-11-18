@@ -111,6 +111,18 @@ const OrderProduct = sequelize.define("orderProduct", {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  drugs: {
+    type: DataTypes.ARRAY(DataTypes.STRING), 
+    allowNull: true,
+  },
+  qty: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  uom: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  }
 });
 
 module.exports = OrderProduct;

@@ -18,6 +18,7 @@ const {
   getOrders,
   getProductsOfDoctor,
   getOrdersWithoutCancel,
+  createLabelPdf,
   // getDoctorsByStore,
 } = require("../controllers/storeController");
 const {
@@ -33,7 +34,7 @@ router.post("/assign-doctors", [verifyToken, isAdmin], assignDoctorToStore);
 // router.get("/store/:SID/doctors", [verifyToken, isAdmin], getDoctorsByStore);
 router.get("/search-store", searchStore);
 router.get("/orders-active", [verifyToken, isStore], getOrdersWithoutCancel)
-router.post("/orders", [verifyToken, isStore], getOrders)
+router.post("/orders/:id", [verifyToken, isStoreOrAdmin], getOrders)
 router.get("/get-doctors/:id", [verifyToken, isStoreOrAdmin], getDoctorsOfStore);
 router.get("/get-doctors", [verifyToken, isAdmin], getDoctorsNotAssigned);
 router.get("/get-products", [verifyToken, isStoreOrDoctor], getProductsOfDoctor);
@@ -50,5 +51,6 @@ router.delete(
   removeDoctorFromStore
 );
 router.patch("/update-store-status", [verifyToken, isStore], updateStoreStatus);
+router.post("/create-label-pdf", [verifyToken, isStore], createLabelPdf);
 
 module.exports = router;

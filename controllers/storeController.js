@@ -22,6 +22,14 @@ const OrderProduct = require("../models/Order/Product");
 const PatientAddress = require("../models/Order/Adress");
 const DoctorOrderMargins = require("../models/Doctor/DoctorOrderMargins");
 const Invoice = require("../models/Order/Invoice");
+const { generateLabelHTML } = require("../pdf/labelhtmlTemplate");
+const puppeteer = require("puppeteer");
+const cloudinary = require("cloudinary").v2;
+cloudinary.config({
+  cloud_name: "dsp7l7i4e",
+  api_key: "478458651528647",
+  api_secret: "Z1qVxAqDzs51O_A9oTcUKi-DJD4",
+});
 
 exports.createStore = async (req, res) => {
   try {
@@ -110,16 +118,13 @@ exports.updateStore = async (req, res) => {
     const store = await Store.findOne({
       where: { SID },
     });
-    console.log("1111111111111111111111111111111111111111");
     if (!store) return res.status(404).json({ error: "Store not found" });
-    console.log("storeDetails.pin", storeDetails?.pin);
+
     if (storeDetails?.pin) {
-      console.log("333333333333333333333333333333333333");
       const token = jwt.sign({ pin: storeDetails.pin }, process.env.JWT_SECRET);
       storeDetails.pin = token;
     }
 
-    console.log("222222222222222222222222222222222222222");
     await store.update(storeDetails);
     await Compliances.update(compliances, { where: { SID } });
     await Address.update(address, { where: { SID } });
@@ -512,6 +517,7 @@ exports.getDoctorsNotAssigned = async (req, res) => {
   }
 };
 
+// This function is used to add products in frequent
 exports.getProductsOfDoctor = async (req, res) => {
   try {
     const id = req.userId;
@@ -525,7 +531,7 @@ exports.getProductsOfDoctor = async (req, res) => {
 
     const products = await StoreProduct.findAll({
       where: { SID: storeSID },
-      attributes: [],
+      attributes: ['storeStock'],
       include: [Product],
       order: [["createdAt", "DESC"]],
     });
@@ -613,9 +619,10 @@ exports.updateStoreStatus = async (req, res) => {
   }
 };
 
+// This function is used to get orders of store on store and admin panel
 exports.getOrders = async (req, res) => {
   try {
-    const SID = req.userId;
+    const SID = req.params.id;
 
     const { addressType = "", orderType = "" } = req.body;
 
@@ -633,7 +640,6 @@ exports.getOrders = async (req, res) => {
     };
 
     let limit = parseInt(req.query.limit) || 10;
-    let order = [["createdAt", "ASC"]];
 
     if (addressType.length === 0 && orderType.length === 0) {
       whereConditions = { SID };
@@ -645,18 +651,25 @@ exports.getOrders = async (req, res) => {
         return res.status(400).json({ error: "Invalid orderType" });
       }
 
+      // Apply addressType condition if specified
+      if (addressType.length > 0) {
+        whereConditions[addressType] = true;
+      }
+
+      // Apply orderType condition
       if (orderType === "new") {
-        order = [["createdAt", "DESC"]];
-        limit = 10;
-        if (addressType.length > 0) {
-          whereConditions[addressType] = true;
-        }
+        whereConditions.orderStatus = null;
       } else {
-        if (addressType.length > 0) {
-          whereConditions[addressType] = true;
-        }
-        if (orderType.length > 0) {
-          whereConditions[orderType] = true;
+        // Map orderType to corresponding orderStatus and ensure other statuses are not set
+        if (orderType === "isPacked") {
+          whereConditions.orderStatus = "Packed";
+        } else if (orderType === "isDispatched") {
+          whereConditions.orderStatus = "Dispatched";
+        } else if (orderType === "isDelivered") {
+          whereConditions.orderStatus = "Delivered";
+        } else if (orderType === "isCancelled") {
+          whereConditions.isCancelled = true;
+          whereConditions.orderStatus = "Cancelled";
         }
       }
     }
@@ -685,16 +698,42 @@ exports.getOrders = async (req, res) => {
           ],
         },
       ],
+      distinct: true,
       order: [["createdAt", "DESC"]],
       limit,
       offset,
     });
 
+    const [allCount, clinicCount, collectCount, addressCount, newCount, acceptedCount, packedCount, dispatchedCount, deliveredCount, cancelledCount] = await Promise.all([
+      Order.count({ where: { SID } }),
+      Order.count({ where: { SID, isClinic: true } }),
+      Order.count({ where: { SID, isCollect: true } }),
+      Order.count({ where: { SID, isAddress: true } }),
+      Order.count({ where: { SID, orderStatus: null } }), // New orders with no status yet
+      Order.count({ where: { SID, orderStatus: "Accepted" } }),
+      Order.count({ where: { SID, orderStatus: "Packed" } }),
+      Order.count({ where: { SID, orderStatus: "Dispatched" } }),
+      Order.count({ where: { SID, orderStatus: "Delivered" } }),
+      Order.count({ where: { SID, isCancelled: true, orderStatus: "Cancelled" } }),
+    ]);
+
     res.status(200).json({
       currentPage: page,
       limit,
-      totalItems: orders?.length,
+      totalItems: count,
       totalPages: Math.ceil(count / limit),
+      counts: {
+        all: allCount,
+        isClinic: clinicCount,
+        isCollect: collectCount,
+        isAddress: addressCount,
+        new: newCount,
+        isAccepted: acceptedCount,
+        isPacked: packedCount,
+        isDispatched: dispatchedCount,
+        isDelivered: deliveredCount,
+        isCancelled: cancelledCount,
+      },
       orders,
     });
   } catch (err) {
@@ -702,84 +741,27 @@ exports.getOrders = async (req, res) => {
   }
 };
 
-const calculateDaysDifference = (date) => {
-  const today = new Date();
-  const orderDate = new Date(date);
-  const timeDiff = today - orderDate;
-  const daysDifference = Math.floor(timeDiff / (1000 * 60 * 60 * 24)); // Convert milliseconds to days
-  return daysDifference;
-};
-
-const filterOrdersByDosageAndTimeFrame = (orders) => {
-  return orders.filter((order) => {
-    const has100PercentBalance = order?.orderProducts.some((product) => {
-      const rxUnits = Number(product.rxUnits);
-      const orderQty = Number(product.orderQty);
-      const balanceUnits = rxUnits - orderQty;
-      const balanceDosagePercentage =
-        rxUnits > 0 ? (balanceUnits / rxUnits) * 100 : 0;
-      return balanceDosagePercentage === 100;
-    });
-
-    const hasLessThan100PercentBalance = order?.orderProducts.some(
-      (product) => {
-        const rxUnits = Number(product.rxUnits);
-        const orderQty = Number(product.orderQty);
-        const balanceUnits = rxUnits - orderQty;
-        const balanceDosagePercentage =
-          rxUnits > 0 ? (balanceUnits / rxUnits) * 100 : 0;
-        return balanceDosagePercentage < 100;
-      }
-    );
-
-    const daysSinceOrder = calculateDaysDifference(order?.createdAt);
-
-    // Show orders with 100% balance dosage within 1 week
-    if (has100PercentBalance && daysSinceOrder <= 7) {
-      return true;
-    }
-
-    // Show orders with less than 100% balance dosage within 1 month
-    if (hasLessThan100PercentBalance && daysSinceOrder <= 30) {
-      return true;
-    }
-
-    return false; // Filter out orders that don't meet criteria
-  });
-};
-
 exports.getOrdersWithoutCancel = async (req, res) => {
   try {
     const SID = req.userId;
 
-    const { addressType = "" } = req.body;
-
-    const validAddressTypes = ["isClinic", "isCollect", "isAddress"];
-
     let whereConditions = {
       SID,
       isCancelled: false,
+      balanceDosageTime: {
+        [Op.gt]: new Date(), // Only include orders with balanceDosageTime in the future
+      },
     };
-
-    if (addressType.length === 0) {
-      whereConditions = { SID, isCancelled: false };
-    } else {
-      if (addressType.length > 0 && !validAddressTypes.includes(addressType)) {
-        return res.status(400).json({ error: "Invalid address type" });
-      }
-      whereConditions[addressType] = true;
-    }
 
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    const { count, rows: orders } = await Order.findAndCountAll({
+    const ordersWithoutCancel = await Order.findAndCountAll({
       where: whereConditions,
       include: [
         PatientDetails,
         Billing,
-        PatientAddress,
         OrderProduct,
         Invoice,
         {
@@ -797,14 +779,91 @@ exports.getOrdersWithoutCancel = async (req, res) => {
         },
       ],
       order: [["createdAt", "DESC"]],
+      distinct: true,
       limit,
       offset,
     });
-    console.log("orders==================", orders);
+    
     res.status(200).json({
-      orders,
+      currentPage: page,
+      limit,
+      totalItems: ordersWithoutCancel?.count,
+      totalPages: Math.ceil(ordersWithoutCancel?.count / limit),
+      data: ordersWithoutCancel?.rows,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+exports.createLabelPdf = async (req, res) => {
+  try {
+    const data = req.body;
+    const urls = [];
+    const maxLabelsPerPage = 3; 
+    const browser = await puppeteer.launch();
+
+    const extraMap = data.product.reduce((map, product) => {
+      if (!map[product.extra]) {
+        map[product.extra] = [];
+      }
+      map[product.extra].push(product.productName);
+      return map;
+    }, {});
+
+    for (const product of data.product) {
+      const extraMedicineName = extraMap[product.extra]?.filter(
+        (name) => name !== product.productName
+      ) || [];
+      const orderQty = parseInt(product.orderQty, 10);
+
+      // Create a new page for each product
+      const page = await browser.newPage();
+      const htmlContentArray = [];
+
+      // Generate paginated HTML content
+      for (let i = 0; i < orderQty; i += maxLabelsPerPage) {
+        const currentBatch = [];
+        for (let j = i; j < i + maxLabelsPerPage && j < orderQty; j++) {
+          const htmlContent = generateLabelHTML(product, extraMedicineName);
+          currentBatch.push(htmlContent);
+        }
+        const batchHtml = currentBatch.join('');
+        htmlContentArray.push(
+          `<div style="page-break-after: always;">${batchHtml}</div>`
+        );
+      }
+
+      // Join all pages into a single string
+      const combinedHtmlContent = htmlContentArray.join('');
+
+      await page.setContent(combinedHtmlContent, { waitUntil: 'domcontentloaded' });
+
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+      });
+
+      const uploadPromise = new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream({ resource_type: 'raw' }, (error, result) => {
+          if (error) {
+            return reject(error);
+          }
+          resolve(result.secure_url);
+        }).end(pdfBuffer);
+      });
+
+      const uploadedUrl = await uploadPromise;
+      urls.push(uploadedUrl);
+
+      await page.close();
+    }
+
+    await browser.close();
+
+    res.status(200).json({ success: true, urls });
+  } catch (error) {
+    console.error('Error generating PDF labels:', error);
+    res.status(500).json({ error: error.message });
   }
 };

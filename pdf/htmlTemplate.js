@@ -1,4 +1,69 @@
-const generateHTML = (data) => `
+const fs = require('fs');
+const path = require('path');
+const moment = require('moment');
+
+const generateProductRows = (products) => {
+  return products.map((product, index) => `
+    <tr>
+      <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 70px; color: #513e3e; font-weight: 500;">
+        ${index + 1}.
+      </td>
+      <td style="font-size: 14px; text-align: left; padding: 8px 12px; color: #513e3e; width: 100px; font-weight: 500;">
+        ${product.type}
+      </td>
+      <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 250px; color: #513e3e; font-weight: 500;">
+        ${product.productName}
+      </td>
+      <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 150px; color: #513e3e; font-weight: 500;">
+        ${product.morningTime}-${product.midDay}-${product.eveningTime}-${product.night}-${product.takenTime}
+      </td>
+      <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 150px; color: #513e3e; font-weight: 500;text-align:center;">
+        ${product.rxUnits}
+      </td>
+      <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 100px; color: #513e3e; font-weight: 500;text-align:center;">
+        ${product.rxDays}
+      </td>
+      <td style="font-size: 14px; text-align: right; padding: 8px 12px; width: 150px; color: #513e3e; font-weight: 500;text-align:center;">
+        ${product.dosageNote}
+      </td>
+    </tr>
+  `).join("");
+};
+
+const generateHTML = (data, doctor) => {
+  const doctorName = doctor?.personalInfo?.name
+  const personalInfo = doctor?.personalInfo?.qualificationSpecialisation
+  const contactNumber = doctor?.contactNumber
+  const clinicName = doctor?.personalInfo?.clinicName
+  const premisesNo = doctor?.clinicAddress?.premisesNo
+  const floor = doctor?.clinicAddress?.floor
+  const areaRoad = doctor?.clinicAddress?.areaRoad
+  const landmark = doctor?.clinicAddress?.landmark
+  const city = doctor?.clinicAddress?.city
+  const state = doctor?.clinicAddress?.state
+  const pinCode = doctor?.clinicAddress?.pinCode
+  const clinicContactNumber = doctor?.clinicAddress?.clinicContactNumber
+  const patientName = data?.patient?.name
+  const patientPremisesNoFloor = data?.delivery?.address?.premisesNoFloor
+  const patientAreaRoad = data?.delivery?.address?.areaRoad
+  const patientLandmark = data?.delivery?.address?.landmark
+  const patientCity = data?.delivery?.address?.city
+  const patientState = data?.delivery?.address?.state
+  const patientPincode = data?.delivery?.address?.pincode
+  const patientPhoneNumber = data?.delivery?.address?.phoneNumber
+
+  const imageRxPath = path.join(__dirname, '../pdfimages/rx.png');
+  const imageRxBase64 = fs.readFileSync(imageRxPath, { encoding: 'base64' });
+  const imageRxSrc = `data:image/png;base64,${imageRxBase64}`;
+
+  const imageLogoPath = path.join(__dirname, '../pdfimages/logo.png');
+  const imageLogoBase64 = fs.readFileSync(imageLogoPath, { encoding: 'base64' });
+  const imageLogoSrc = `data:image/png;base64,${imageLogoBase64}`;
+
+  const todayDate = moment().format('DD/MM/YYYY');
+
+
+  return `
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -61,7 +126,7 @@ const generateHTML = (data) => `
                               color: #e62121;
                             "
                           >
-                            Doctor Name
+                          ${doctorName ? `${doctor?.personalInfo?.name} ${doctor?.personalInfo?.surname}`  : ""}
                           </h1>
                           <p
                             style="
@@ -71,7 +136,7 @@ const generateHTML = (data) => `
                               color: #513e3e;
                             "
                           >
-                            Qualification/Specialisation
+                            ${personalInfo ? `${doctor?.personalInfo?.qualificationSpecialisation}`  : ""}
                           </p>
                           <p
                             style="
@@ -81,7 +146,7 @@ const generateHTML = (data) => `
                               color: #513e3e;
                             "
                           >
-                            Tel:<b style="font-weight: 600">1245978636</b>
+                            Tel:<b style="font-weight: 600">${contactNumber ? `${contactNumber}`  : ""}</b>
                           </p>
                         </div>
                       </td>
@@ -105,7 +170,7 @@ const generateHTML = (data) => `
                                     color: #e62121;
                                   "
                                 >
-                                  Clinic Name
+                                ${clinicName ? `${clinicName}`  : ""}
                                 </h1>
                                 <p
                                   style="
@@ -115,7 +180,7 @@ const generateHTML = (data) => `
                                     color: #513e3e;
                                   "
                                 >
-                                  Premises No., Floor, Road, Landmark,
+                                  ${premisesNo ? `${premisesNo}`  : ""}, ${floor ? `${floor}`  : ""}, ${areaRoad ? `${areaRoad}`  : ""}, ${landmark ? `${landmark}`  : ""},
                                 </p>
                                 <p
                                   style="
@@ -125,7 +190,7 @@ const generateHTML = (data) => `
                                     color: #513e3e;
                                   "
                                 >
-                                  City, State, Pincode.
+                                  ${city ? `${city}`  : ""}, ${state ? `${state}`  : ""}, ${pinCode ? `${pinCode}`  : ""}.
                                 </p>
                                 <p
                                   style="
@@ -135,7 +200,7 @@ const generateHTML = (data) => `
                                     color: #513e3e;
                                   "
                                 >
-                                  Speciality
+                                ${personalInfo ? `${doctor?.personalInfo?.qualificationSpecialisation}`  : ""}
                                 </p>
                                 <p
                                   style="
@@ -145,7 +210,7 @@ const generateHTML = (data) => `
                                     color: #513e3e;
                                   "
                                 >
-                                  Tel:<b style="font-weight: 600">1245978636</b>
+                                  Tel:<b style="font-weight: 600">${clinicContactNumber ? `${clinicContactNumber}`  : ""}</b>
                                 </p>
                               </div>
                             </td>
@@ -176,7 +241,7 @@ const generateHTML = (data) => `
                         color: #8e1010;
                       "
                     >
-                      Patient Name
+                       ${patientName ? `${data?.patient?.name} ${data?.patient?.surname}`  : ""}
                     </h1>
                     <p
                       style="
@@ -186,7 +251,7 @@ const generateHTML = (data) => `
                         color: #513e3e;
                       "
                     >
-                      Premises No., Floor, Area, Road, Landmark,
+                       ${patientPremisesNoFloor ? `${patientPremisesNoFloor}`  : ""}, ${patientAreaRoad ? `${patientAreaRoad}`  : ""}, ${patientLandmark ? `${patientLandmark}`  : ""},
                     </p>
                     <p
                       style="
@@ -196,7 +261,7 @@ const generateHTML = (data) => `
                         color: #513e3e;
                       "
                     >
-                      City, State, Pincode.
+                      ${patientCity ? `${patientCity}`  : ""}, ${patientState ? `${patientState}`  : ""}, ${patientPincode ? `${patientPincode}`  : ""}.
                     </p>
                     <p
                       style="
@@ -206,7 +271,7 @@ const generateHTML = (data) => `
                         color: #513e3e;
                       "
                     >
-                      Tel:<b style="font-weight: 600">1245978636</b>
+                      Tel:<b style="font-weight: 600">${patientPhoneNumber ? `${patientPhoneNumber}`  : ""}</b>
                     </p>
                   </div>
                 </td>
@@ -223,7 +288,7 @@ const generateHTML = (data) => `
               >
                 <tr>
                   <td style="text-align: left">
-                    <img src="./rx.png" style="width: 60px" />
+                    <img src="${imageRxSrc}" style="width: 60px" />
                   </td>
                 </tr>
                 <tr>
@@ -261,7 +326,7 @@ const generateHTML = (data) => `
                         font-weight: 600;
                         color: #8e1010;
                         border-bottom: 1px solid #8e1010;
-                        width: 80px;
+                        width: 70px;
                       "
                     >
                       SN.
@@ -290,7 +355,7 @@ const generateHTML = (data) => `
                         width: 250px;
                       "
                     >
-                      Medicine Name
+                      Medicine Name5
                     </th>
                     <th
                       style="
@@ -313,7 +378,8 @@ const generateHTML = (data) => `
                         font-weight: 600;
                         color: #8e1010;
                         border-bottom: 1px solid #8e1010;
-                        width: 200px;
+                        width: 150px;
+                        text-align:center;
                       "
                     >
                       Mix
@@ -327,6 +393,7 @@ const generateHTML = (data) => `
                         color: #8e1010;
                         border-bottom: 1px solid #8e1010;
                         width: 100px;
+                        text-align:center;
                       "
                     >
                       Rx Days
@@ -340,357 +407,15 @@ const generateHTML = (data) => `
                         color: #8e1010;
                         border-bottom: 1px solid #8e1010;
                         width: 150px;
+                        text-align:center;
                       "
                     >
-                      Note
+                      Note5
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 80px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      1.
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        color: #513e3e;
-                        width: 100px;
-                        font-weight: 500;
-                      "
-                    >
-                      Type
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 250px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Medicine Name
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 150px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      0-0-0-0 A/B
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 150px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Mix
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 100px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Rx Days
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: right;
-                        padding: 8px 12px;
-                        width: 150px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Note
-                    </td>
-                  </tr>
-                  <tr>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 80px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      1.
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        color: #513e3e;
-                        width: 100px;
-                        font-weight: 500;
-                      "
-                    >
-                      Type
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 250px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Medicine Name
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 150px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      0-0-0-0 A/B
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 150px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Mix
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 100px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Rx Days
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: right;
-                        padding: 8px 12px;
-                        width: 150px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Note
-                    </td>
-                  </tr>
-                  <tr>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 80px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      1.
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        color: #513e3e;
-                        width: 100px;
-                        font-weight: 500;
-                      "
-                    >
-                      Type
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 250px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Medicine Name
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 150px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      0-0-0-0 A/B
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 150px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Mix
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 100px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Rx Days
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: right;
-                        padding: 8px 12px;
-                        width: 150px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Note
-                    </td>
-                  </tr>
-                  <tr>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 80px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      1.
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        color: #513e3e;
-                        width: 100px;
-                        font-weight: 500;
-                      "
-                    >
-                      Type
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 250px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Medicine Name
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 150px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      0-0-0-0 A/B
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 150px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Mix
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: left;
-                        padding: 8px 12px;
-                        width: 100px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Rx Days
-                    </td>
-                    <td
-                      style="
-                        font-size: 14px;
-                        text-align: right;
-                        padding: 8px 12px;
-                        width: 150px;
-                        color: #513e3e;
-                        font-weight: 500;
-                      "
-                    >
-                      Note
-                    </td>
-                  </tr>
+                  ${generateProductRows(data?.products)}
                 </tbody>
               </table>
             </div>
@@ -730,7 +455,7 @@ const generateHTML = (data) => `
                       <tbody>
                         <tr>
                           <td style="text-align: left">
-                            <img src="./logo.png" style="width: 100px" />
+                            <img src="${imageLogoSrc}" style="width: 100px" />
                           </td>
                         </tr>
                       </tbody>
@@ -767,7 +492,7 @@ const generateHTML = (data) => `
                                 text-align: right;
                               "
                             >
-                              Date: xx/xx/xxxx
+                              Date: ${todayDate}
                             </p>
                             <h1
                               style="
@@ -779,7 +504,7 @@ const generateHTML = (data) => `
                                 text-align: right;
                               "
                             >
-                              Doctor Name
+                            ${doctorName ? `${doctor?.personalInfo?.name} ${doctor?.personalInfo?.surname}`  : ""}
                             </h1>
                           </td>
                         </tr>
@@ -794,7 +519,7 @@ const generateHTML = (data) => `
       </table>
     </div>
   </body>
-</html>
-`;
+</html>`
+};
 
 module.exports = { generateHTML };
