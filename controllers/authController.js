@@ -13,6 +13,7 @@ const DoctorPublishRecord = require("../models/Doctor/DoctorPublishRecord");
 const DoctorOrderMargins = require("../models/Doctor/DoctorOrderMargins");
 const Invoice = require("../models/Order/Invoice");
 const { sequelize } = require("../config/db");
+const DoctorRent = require("../models/Rent/DoctorRent");
 
 exports.adminSignUp = async (req, res) => {
   try {
@@ -470,12 +471,24 @@ exports.getAllPatients = async (req, res) => {
 
 exports.publishRecord = async (req, res) => {
   try {
+    const { DID, period } = req.body;
+    // const [month, year] = period.split(" ");
+
     const data = await DoctorPublishRecord.create(req.body);
+
+    // const doctorRent = await DoctorRent.findOne({
+    //   where: { DID, month: month, year: year },
+    // })
+    // if(doctorRent) {
+    //   await doctorRent.update({
+    //     isPublished: true,
+    //   })
+    // }
 
     res.status(200).json({ message: "Record published successfully", data: data });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: error?.errors[0].message || error.message });
+    res.status(500).json({ error: error?.errors ? error?.errors[0]?.message : error.message });
   }
 };
 
@@ -493,6 +506,11 @@ exports.getAllPublishRecords = async (req, res) => {
 exports.updatePublishRecord = async (req, res) => {
   try {
     const id = req.params.id;
+    const { period } = req.body;
+    if(period) {
+      var [month, year] = period.split(" ");
+    }
+
     let publishRecord = await DoctorPublishRecord.findOne({
       where: { id: id },
     });
@@ -502,6 +520,15 @@ exports.updatePublishRecord = async (req, res) => {
     }
 
     await publishRecord.update(req.body);
+
+    const doctorRent = await DoctorRent.findOne({
+      where: { DID, month: month, year: year },
+    })
+    if(doctorRent) {
+      await doctorRent.update({
+        isPublished: true,
+      })
+    }
 
     res.status(200).json({ message: "Publish record updated successfully" });
   } catch (error) {

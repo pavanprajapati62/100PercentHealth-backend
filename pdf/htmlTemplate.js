@@ -18,7 +18,7 @@ const generateProductRows = (products) => {
         ${product.morningTime}-${product.midDay}-${product.eveningTime}-${product.night}-${product.takenTime}
       </td>
       <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 150px; color: #513e3e; font-weight: 500;text-align:center;">
-        ${product.rxUnits}
+        ${product?.extra || " "}
       </td>
       <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 100px; color: #513e3e; font-weight: 500;text-align:center;">
         ${product.rxDays}
@@ -410,7 +410,7 @@ const generateHTML = (data, doctor) => {
                         text-align:center;
                       "
                     >
-                      Note5
+                      Note
                     </th>
                   </tr>
                 </thead>

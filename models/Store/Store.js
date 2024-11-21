@@ -47,8 +47,6 @@ const Store = sequelize.define("store", {
 });
 
 Store.beforeCreate(async (store) => {
-  // const storeCount = await Store.count();
-  // const newSID = `SID${String(storeCount + 1).padStart(3, "0")}`;
 
   const lastStore = await Store.findOne({
     order: [['SID', 'DESC']],
