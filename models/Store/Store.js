@@ -42,6 +42,7 @@ const Store = sequelize.define("store", {
   fcmToken: {
     type: DataTypes.JSONB, 
     defaultValue: [],
+    allowNull: true,
   }
 });
 

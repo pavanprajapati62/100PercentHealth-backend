@@ -198,7 +198,11 @@ const Order = sequelize.define("order", {
   balanceDosageTime: {
     type: DataTypes.DATE,
     allowNull: true,
-  }
+  },
+  isPublishedRecord: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
 });
 
 Order.beforeCreate(async (order) => {

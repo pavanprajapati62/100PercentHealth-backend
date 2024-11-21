@@ -16,7 +16,7 @@ const { verifyToken, isStoreOrDoctor } = require("../middlewares/roleMiddleware"
 const router = express.Router();
 
 router.post("/", [verifyToken, isStoreOrDoctor], createOrder);
-router.get("/getP/:id", getPatientByID)
+router.get("/getPatient/:id", getPatientByID)
 router.post("/uploadImage", upload.single("image"), uploadImage);
 router.get("/all", [verifyToken], getAllOrders);
 router.get("/:id", getOrderById);

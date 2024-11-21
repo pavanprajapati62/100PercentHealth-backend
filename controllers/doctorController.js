@@ -65,11 +65,8 @@ exports.createDoctor = async (req, res) => {
       .status(201)
       .json({ message: "Doctor and related details created successfully." });
   } catch (err) {
-    console.error("Error creating doctor:", err);
-    // res
-    //   .status(500)
-    //   .json({ error: "Failed to create doctor and related details." });
-    res.status(500).json({ error: err });
+    console.error("Error creating doctor:", err?.errors[0]?.message);
+    res.status(500).json({ error: err?.errors[0]?.message || err });
   }
 };
 
@@ -499,7 +496,9 @@ exports.createPdf = async (req, res) => {
 
     const htmlContent = generateHTML(data, doctor);
 
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox']
+    });
     const page = await browser.newPage();
 
     await page.setContent(htmlContent, { waitUntil: "domcontentloaded" });

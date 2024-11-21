@@ -11,23 +11,23 @@ const ProductMargin = sequelize.define("productMargin", {
     allowNull: false,
   },
   category_a: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.FLOAT,
     allowNull: true,
   },
   category_b: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.FLOAT,
     allowNull: true,
   },
   category_c: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.FLOAT,
     allowNull: true,
   },
   category_d: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.FLOAT,
     allowNull: true,
   },
   category_e: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.FLOAT,
     allowNull: true,
   },
 });

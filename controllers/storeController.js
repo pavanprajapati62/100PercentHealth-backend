@@ -55,7 +55,7 @@ exports.createStore = async (req, res) => {
     console.error("Error creating store:", err);
     res
       .status(500)
-      .json({ error: "Failed to create store and related details." });
+      .json({ error: err?.errors[0]?.message || err });
   }
 };
 
@@ -532,7 +532,12 @@ exports.getProductsOfDoctor = async (req, res) => {
     const products = await StoreProduct.findAll({
       where: { SID: storeSID },
       attributes: ['storeStock'],
-      include: [Product],
+      include: [
+        {
+          model: Product,
+          where: { isProductDeleted: false }, 
+        },
+      ],
       order: [["createdAt", "DESC"]],
     });
     res.status(200).json(products);
@@ -558,12 +563,28 @@ exports.getProductsOfStore = async (req, res) => {
       offset,
     });
 
+    const parsedData = products?.map(product => {
+      const productData = product?.product.toJSON();
+      productData.drugs = productData?.drugs?.map(drug => {
+        try {
+          return JSON.parse(drug);
+        } catch {
+          return drug; // Return as is if parsing fails
+        }
+      });
+
+      return {
+        ...product.toJSON(),
+        product: productData,
+      };
+    });
+
     res.status(200).json({
       currentPage: page,
       limit,
       totalItems: count,
       totalPages: Math.ceil(count / limit),
-      data: products,
+      data: parsedData,
     });
   } catch (err) {
     console.error(err);
@@ -664,15 +685,24 @@ exports.getOrders = async (req, res) => {
         if (orderType === "isPacked") {
           whereConditions.orderStatus = "Packed";
         } else if (orderType === "isDispatched") {
-          whereConditions.orderStatus = "Dispatched";
+          if(addressType === "isCollect") {
+            whereConditions = { OID: null };
+          } else {
+            whereConditions.orderStatus = "Dispatched";
+          }
         } else if (orderType === "isDelivered") {
-          whereConditions.orderStatus = "Delivered";
+          if(addressType === "isCollect") {
+            whereConditions = { OID: null };
+          } else {
+            whereConditions.orderStatus = "Delivered";
+          }
         } else if (orderType === "isCancelled") {
           whereConditions.isCancelled = true;
           whereConditions.orderStatus = "Cancelled";
         }
       }
     }
+    console.log("whereConditions=====",  whereConditions)
 
     const page = parseInt(req.query.page) || 1;
     const offset = (page - 1) * limit;
@@ -704,36 +734,63 @@ exports.getOrders = async (req, res) => {
       offset,
     });
 
-    const [allCount, clinicCount, collectCount, addressCount, newCount, acceptedCount, packedCount, dispatchedCount, deliveredCount, cancelledCount] = await Promise.all([
-      Order.count({ where: { SID } }),
-      Order.count({ where: { SID, isClinic: true } }),
-      Order.count({ where: { SID, isCollect: true } }),
-      Order.count({ where: { SID, isAddress: true } }),
-      Order.count({ where: { SID, orderStatus: null } }), // New orders with no status yet
-      Order.count({ where: { SID, orderStatus: "Accepted" } }),
-      Order.count({ where: { SID, orderStatus: "Packed" } }),
-      Order.count({ where: { SID, orderStatus: "Dispatched" } }),
-      Order.count({ where: { SID, orderStatus: "Delivered" } }),
-      Order.count({ where: { SID, isCancelled: true, orderStatus: "Cancelled" } }),
-    ]);
+    const counts = {};
+
+    const allCount = await Order.count({ where: { SID, [addressType]: true } });
+
+    const clinicCount = await Order.count({
+      where: { SID, [addressType]: true },
+    });
+
+    const collectCount = await Order.count({
+      where: { SID, [addressType]: true },
+    });
+
+    const addressCount = await Order.count({
+      where: { SID, [addressType]: true },
+    });
+
+    const newCount = await Order.count({
+      where: { SID, [addressType]: true, orderStatus: null },
+    });
+
+    const acceptedCount = await Order.count({
+      where: { SID, [addressType]: true, orderStatus: "Accepted" },
+    });
+
+    const packedCount = await Order.count({
+      where: { SID, [addressType]: true, orderStatus: "Packed" },
+    });
+
+    const dispatchedCount = await Order.count({
+      where: { SID, [addressType]: true, orderStatus: "Dispatched" },
+    });
+
+    const deliveredCount = await Order.count({
+      where: { SID, [addressType]: true, orderStatus: "Delivered" },
+    });
+
+    const cancelledCount = await Order.count({
+      where: { SID, [addressType]: true, isCancelled: true, orderStatus: "Cancelled" },
+    });
+
+    counts[`all`] = allCount;
+    counts[`isClinic`] = clinicCount;
+    counts[`isCollect`] = collectCount;
+    counts[`isAddress`] = addressCount;
+    counts[`new`] = newCount;
+    counts[`isAccepted`] = acceptedCount;
+    counts[`isPacked`] = packedCount;
+    counts[`isDispatched`] = dispatchedCount;
+    counts[`isDelivered`] = deliveredCount;
+    counts[`isCancelled`] = cancelledCount;
 
     res.status(200).json({
       currentPage: page,
       limit,
       totalItems: count,
       totalPages: Math.ceil(count / limit),
-      counts: {
-        all: allCount,
-        isClinic: clinicCount,
-        isCollect: collectCount,
-        isAddress: addressCount,
-        new: newCount,
-        isAccepted: acceptedCount,
-        isPacked: packedCount,
-        isDispatched: dispatchedCount,
-        isDelivered: deliveredCount,
-        isCancelled: cancelledCount,
-      },
+      counts,
       orders,
     });
   } catch (err) {
@@ -796,12 +853,23 @@ exports.getOrdersWithoutCancel = async (req, res) => {
   }
 };
 
+// Function to chunk data into groups of a specified size
+const chunkArray = (array, size) => {
+  const chunked = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunked.push(array.slice(i, i + size));
+  }
+  return chunked;
+};
+
+// Updated PDF creation logic
 exports.createLabelPdf = async (req, res) => {
   try {
     const data = req.body;
     const urls = [];
-    const maxLabelsPerPage = 3; 
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox']
+    });
 
     const extraMap = data.product.reduce((map, product) => {
       if (!map[product.extra]) {
@@ -811,54 +879,59 @@ exports.createLabelPdf = async (req, res) => {
       return map;
     }, {});
 
+    const htmlContentArray = [];
+
+    // Collect HTML content for all products
     for (const product of data.product) {
       const extraMedicineName = extraMap[product.extra]?.filter(
         (name) => name !== product.productName
       ) || [];
       const orderQty = parseInt(product.orderQty, 10);
 
-      // Create a new page for each product
-      const page = await browser.newPage();
-      const htmlContentArray = [];
-
-      // Generate paginated HTML content
-      for (let i = 0; i < orderQty; i += maxLabelsPerPage) {
-        const currentBatch = [];
-        for (let j = i; j < i + maxLabelsPerPage && j < orderQty; j++) {
-          const htmlContent = generateLabelHTML(product, extraMedicineName);
-          currentBatch.push(htmlContent);
-        }
-        const batchHtml = currentBatch.join('');
-        htmlContentArray.push(
-          `<div style="page-break-after: always;">${batchHtml}</div>`
-        );
+      // Generate HTML for the current product based on orderQty
+      for (let i = 0; i < orderQty; i++) {
+        const htmlContent = generateLabelHTML(product, extraMedicineName);
+        htmlContentArray.push(htmlContent);
       }
-
-      // Join all pages into a single string
-      const combinedHtmlContent = htmlContentArray.join('');
-
-      await page.setContent(combinedHtmlContent, { waitUntil: 'domcontentloaded' });
-
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-      });
-
-      const uploadPromise = new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream({ resource_type: 'raw' }, (error, result) => {
-          if (error) {
-            return reject(error);
-          }
-          resolve(result.secure_url);
-        }).end(pdfBuffer);
-      });
-
-      const uploadedUrl = await uploadPromise;
-      urls.push(uploadedUrl);
-
-      await page.close();
     }
 
+    // Group HTML content into pages (3 labels per page)
+    const groupedContent = chunkArray(htmlContentArray, 3);
+
+    // Generate HTML with page breaks for each group
+    const combinedHtmlContent = groupedContent
+      .map(
+        (group) => `
+        <div style="width: 100%; margin-bottom: 20px;">
+          ${group.join('<div style="height: 20px;"></div>')}
+        </div>
+        <div style="page-break-after: always;"></div>
+      `
+      )
+      .join('');
+
+    // Create a new page for the combined HTML content
+    const page = await browser.newPage();
+    await page.setContent(combinedHtmlContent, { waitUntil: 'domcontentloaded' });
+
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+    });
+
+    const uploadPromise = new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream({ resource_type: 'raw' }, (error, result) => {
+        if (error) {
+          return reject(error);
+        }
+        resolve(result.secure_url);
+      }).end(pdfBuffer);
+    });
+
+    const uploadedUrl = await uploadPromise;
+    urls.push(uploadedUrl);
+
+    await page.close();
     await browser.close();
 
     res.status(200).json({ success: true, urls });

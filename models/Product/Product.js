@@ -60,11 +60,13 @@ const Product = sequelize.define("product", {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  isProductDeleted: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
 });
 
 Product.beforeCreate(async (product) => {
-  // const productCount = await Product.count();
-  // const newIID = `IID${String(productCount + 1).padStart(3, "0")}`;
 
   const lastproduct = await Product.findOne({
     order: [['IID', 'DESC']],
