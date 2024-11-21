@@ -55,7 +55,7 @@ exports.createStore = async (req, res) => {
     console.error("Error creating store:", err);
     res
       .status(500)
-      .json({ error: "Failed to create store and related details." });
+      .json({ error: err?.errors[0]?.message || err });
   }
 };
 
@@ -766,7 +766,6 @@ exports.getOrders = async (req, res) => {
       where: { SID, [addressType]: true, orderStatus: "Dispatched" },
     });
 
-    console.log("addressType===", addressType)
     const deliveredCount = await Order.count({
       where: { SID, [addressType]: true, orderStatus: "Delivered" },
     });

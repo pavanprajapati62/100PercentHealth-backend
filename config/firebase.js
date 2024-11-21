@@ -20,28 +20,19 @@ const sendNotification = async (tokens, message) => {
       return;
     }
 
-    // Use sendMulticast for sending notifications to multiple devices
-    // console.log("tokens===", tokens);
-    // console.log("admin=======", admin);
-    // console.log("----------", typeof admin.messaging);
-    // console.log("kkk", Object.keys(admin.messaging()));
-    //   const response = await admin.messaging().sendMulticast({
-    //     tokens: tokens,
-    //     notification: {
-    //       title: message.title,
-    //       body: message.body,
-    //     },
-    //   });
-    // const response = await admin.messaging().sendToDevice(tokens, payload);
     console.log("tokens===========", tokens)
     console.log("payload===", payload)
     for (const token of tokens) {
-      const response = await admin.messaging().send({
-        token,
-        notification: payload.notification,
-      });
-      console.log("Notification sent to token:", token);
-      console.log("response----", response);
+      try {
+        const response = await admin.messaging().send({
+          token,
+          notification: payload.notification,
+        });
+        console.log("Notification sent to token:", token);
+        console.log("response----", response);
+      } catch (error) {
+        console.error(`Error sending notification to token: ${token}`, error);
+      }
     }
   } catch (error) {
     console.error("Error sending notifications:", error);

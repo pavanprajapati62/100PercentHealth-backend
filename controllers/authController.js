@@ -475,7 +475,7 @@ exports.publishRecord = async (req, res) => {
     res.status(200).json({ message: "Record published successfully", data: data });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error?.errors[0].message || error.message });
   }
 };
 

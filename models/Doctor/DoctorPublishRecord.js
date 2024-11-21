@@ -54,6 +54,7 @@ const DoctorPublishRecord = sequelize.define("doctorPublishRecord", {
   detail: {
     type: DataTypes.JSONB, 
     defaultValue: [],
+    allowNull: true,
   },
 });
 
