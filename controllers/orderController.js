@@ -17,6 +17,7 @@ const Store = require("../models/Store/Store");
 const { cloudinaryUploadImage } = require("../utils/cloudinary");
 const moment = require("moment");
 const { admin, sendNotification } = require("../config/firebase");
+const fs = require("fs").promises;
 
 const filterOrdersByDosageAndTimeFrame = async (orders) => {
   try {
@@ -187,6 +188,7 @@ exports.uploadImage = async (req, res) => {
     var locaFilePath = req?.file?.path;
     if (locaFilePath) {
       var result = await cloudinaryUploadImage(locaFilePath);
+      await fs.unlink(locaFilePath);
     }
 
     res.status(200).json({

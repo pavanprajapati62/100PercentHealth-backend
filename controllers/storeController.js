@@ -622,7 +622,7 @@ exports.removeDoctorFromStore = async (req, res) => {
 exports.updateStoreStatus = async (req, res) => {
   try {
     const SID = req.userId;
-    const { currentStoreStatus } = req.body;
+    const { currentStoreStatus, fcmToken } = req.body;
 
     const store = await Store.findOne({ where: { SID: SID } });
 
@@ -633,6 +633,13 @@ exports.updateStoreStatus = async (req, res) => {
     store.currentStoreStatus = currentStoreStatus;
 
     await store.update({ currentStoreStatus });
+
+    if (fcmToken) {
+      if (store.fcmToken.includes(fcmToken)) {
+        store.fcmToken = store.fcmToken.filter((token) => token !== fcmToken);
+        await store.update({ fcmToken: store.fcmToken });
+      }
+    }
 
     res.status(200).json({ message: "Store status updated" });
   } catch (err) {

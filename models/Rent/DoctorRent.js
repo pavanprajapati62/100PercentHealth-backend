@@ -26,6 +26,10 @@ const DoctorRent = sequelize.define("doctorRent", {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  isPublished: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  }
 });
 
 module.exports = DoctorRent;

@@ -197,6 +197,10 @@ async function getRentOfDoctor(req, res) {
       return res.status(404).json({ error: "No Record Found" });
     }
 
+    if(doctorRent?.isPublished === true) {
+      return res.status(400).json({ error: "Record already published" });
+    }
+
     const monthMapping = {
       January: 1,
       February: 2,
@@ -268,7 +272,7 @@ async function getRentOfDoctor(req, res) {
       });
     }
     
-    orders.forEach((order) => {
+    orders?.forEach((order) => {
       const createdDate = new Date(order.createdAt);  
       const day = createdDate.getUTCDate();  
       const invoiceAmount = parseFloat(order?.invoice?.invoiceAmount) || 0; 
