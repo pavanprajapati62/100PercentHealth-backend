@@ -33,6 +33,8 @@ const sendNotification = async (tokens, message) => {
     //     },
     //   });
     // const response = await admin.messaging().sendToDevice(tokens, payload);
+    console.log("tokens===========", tokens)
+    console.log("payload===", payload)
     for (const token of tokens) {
       const response = await admin.messaging().send({
         token,

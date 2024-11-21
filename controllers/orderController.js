@@ -293,7 +293,6 @@ exports.updateOrder = async (req, res) => {
       include: [OrderProduct]
     });
     const dataOrder = await order.get({plain: true});
-    console.log("dataOrder=======", dataOrder)
 
     if (!order) return res.status(404).json({ error: "Order not found" });
 
@@ -542,13 +541,12 @@ exports.updateOrderStatus = async (req, res) => {
       order.packedTime = new Date();
 
       if(order?.isCollect === true) {
-        console.log("11111111111111111111111111111111111111111111111111111111111111111111111")
         const duration = moment.duration(
           moment(order.packedTime).diff(moment(order.acceptTime))
         );
         const hours = duration.asHours().toFixed(0);
         const minutes = duration.minutes();
-        order.S1 = `${hours} hours ${minutes} minutes`;
+        order.S1 = `${hours} hours : ${minutes} minutes`;
         order.QP = `${hours} hours ${minutes} minutes`;
       }
 
@@ -576,6 +574,12 @@ exports.updateOrderStatus = async (req, res) => {
         balanceDosageTime = currentDate.add(1, 'month').toDate();
       }
       order.balanceDosageTime = balanceDosageTime;
+      if(invoice) {
+        invoiceData = await Invoice.findOne({
+          where: { IVID: invoice?.IVID }
+        })
+        await invoiceData.update(invoice)
+      }
     }
     if (isDispatched) {
       order.isDispatched = true;
@@ -588,7 +592,7 @@ exports.updateOrderStatus = async (req, res) => {
         );
         const hours = duration.asHours().toFixed(0);
         const minutes = duration.minutes();
-        order.S1 = `${hours} hours ${minutes} minutes`;
+        order.S1 = `${hours} hours : ${minutes} minutes`;
       }
 
       const duration = moment.duration(
@@ -597,9 +601,15 @@ exports.updateOrderStatus = async (req, res) => {
       const hours = duration.asHours().toFixed(0);
       const minutes = duration.minutes();
       order.QD = `${hours} hours ${minutes} minutes`;
+
+      if(invoice) {
+        invoiceData = await Invoice.findOne({
+          where: { IVID: invoice?.IVID }
+        })
+        await invoiceData.update(invoice)
+      }
     }
     if (isDelivered) {
-      console.log("order===", order)
       order.isDelivered = true;
       order.orderStatus = "Delivered";
       order.deliveredTime = new Date();
@@ -610,14 +620,14 @@ exports.updateOrderStatus = async (req, res) => {
         );
         const hours = duration.asHours().toFixed(0);
         const minutes = duration.minutes();
-        order.S2 = `${hours} hours ${minutes} minutes`;
+        order.S2 = `${hours} hours : ${minutes} minutes`;
       } else if(order?.isCollect === true) {
         const duration = moment.duration(
           moment(order.collectedTime).diff(moment(order.packedTime))
         );
         const hours = duration.asHours().toFixed(0);
         const minutes = duration.minutes();
-        order.S2 = `${hours} hours ${minutes} minutes`;
+        order.S2 = `${hours} hours : ${minutes} minutes`;
         order.PC = `${hours} hours ${minutes} minutes`; // Calculate PC (Packed to Delivered Time)
       }
 
@@ -650,6 +660,13 @@ exports.updateOrderStatus = async (req, res) => {
         const hours = duration.asHours().toFixed(0);
         const minutes = duration.minutes();
         order.ET = `${hours} hours ${minutes} minutes`;
+      }
+
+      if(invoice) {
+        invoiceData = await Invoice.findOne({
+          where: { IVID: invoice?.IVID }
+        })
+        await invoiceData.update(invoice)
       }
     }
 

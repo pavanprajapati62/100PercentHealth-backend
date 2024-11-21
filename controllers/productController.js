@@ -4,6 +4,8 @@ const StoreProduct = require("../models/Product/StoreProduct");
 const Store = require("../models/Store/Store");
 const ProductMargin = require("../models/Product/ProductMargin");
 const { sequelize } = require("../config/db");
+const OrderProduct = require("../models/Order/Product");
+const Order = require("../models/Order/Order");
 
 exports.createProduct = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -94,18 +96,30 @@ exports.getAllProducts = async (req, res) => {
     const offset = (page - 1) * limit;
 
     const { count, rows: products } = await Product.findAndCountAll({
+      where: { isProductDeleted: false},
       include: [{ model: ProductMargin }],
       order: [["createdAt", "DESC"]],
       limit,
       offset,
     });
 
+    const parsedProducts = products?.map(product => ({
+      ...product.toJSON(),
+      drugs: product?.drugs?.map(drug => {0.
+        try {
+          return JSON.parse(drug);
+        } catch {
+          return drug; // Return as is if not JSON
+        }
+      }),
+    }));
+
     res.status(200).json({
       currentPage: page,
       limit,
       totalItems: count,
       totalPages: Math.ceil(count / limit),
-      products,
+      products: parsedProducts,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -131,7 +145,6 @@ exports.getProductById = async (req, res) => {
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
   const { marginPercentage, units, storeQty, ...updatedData } = req.body;
-  console.log("updatedData================", updatedData)
 
   try {
     const product = await Product.findOne({
@@ -244,7 +257,29 @@ exports.deleteProduct = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    await product.destroy();
+    const associatedOrders = await OrderProduct.findAll({
+      where: { IID: product?.IID },
+      include: {
+        model: Order,
+        attributes: ["isAccepted", "OID"],
+      },
+    });
+
+    const pendingOrders = associatedOrders?.filter((orderProduct) => {
+      return orderProduct.order && !orderProduct.order.isAccepted;
+    });
+
+    if (pendingOrders.length > 0) {
+      return res.status(400).json({
+        message: "Cannot delete product. Some orders are not yet accepted.",
+        pendingOrders: pendingOrders.map((order) => order.order.OID),
+      });
+    }
+
+    await product.update({
+      isProductDeleted: true,
+    });
+    
     res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -6,12 +6,13 @@ const Store = require("../models/Store/Store");
 const Admin = require("../models/Admin");
 const Order = require("../models/Order/Order");
 const PatientDetails = require("../models/Order/PatientDetails");
-const { Op } = require("sequelize");
+const { Op, fn, col } = require("sequelize");
 const PersonalInfo = require("../models/Doctor/PersonalInfo");
 const PatientAddress = require("../models/Order/Adress");
 const DoctorPublishRecord = require("../models/Doctor/DoctorPublishRecord");
 const DoctorOrderMargins = require("../models/Doctor/DoctorOrderMargins");
 const Invoice = require("../models/Order/Invoice");
+const { sequelize } = require("../config/db");
 
 exports.adminSignUp = async (req, res) => {
   try {
@@ -54,13 +55,55 @@ exports.adminLogin = async (req, res) => {
     res.status(401).send({ message: error.message });
   }
 };
-exports.refreshToken = async (req, res) => {
-  console.log('refreshToken', req.body);
-  res.status(200).json({
-    message: "refresh token generated successful",
-    refreshToken: req.body.refresh_token
-  });
 
+exports.refreshToken = async (req, res) => {
+  const { refreshToken } = req.body;
+  try {
+    let decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+
+    if(decoded?.DID) {
+      var newToken = jwt.sign(
+        { DID: decoded?.DID, role: decoded?.role },
+        process.env.JWT_SECRET,
+        { expiresIn: "24h" }
+      );
+  
+      var newRefreshToken = jwt.sign(
+        { DID: decoded?.DID, role: decoded?.role },
+        process.env.JWT_SECRET
+      );
+    } else if(decoded?.SID) {
+      var newToken = jwt.sign(
+        { DID: decoded?.SID, role: decoded?.role },
+        process.env.JWT_SECRET,
+        { expiresIn: "24h" }
+      );
+  
+      var newRefreshToken = jwt.sign(
+        { DID: decoded?.DID, role: decoded?.role },
+        process.env.JWT_SECRET
+      );
+    } else {
+      var newToken = jwt.sign(
+        { id: decoded?.id, role: decoded?.role },
+        process.env.JWT_SECRET,
+        { expiresIn: "24h" }
+      );
+  
+      var newRefreshToken = jwt.sign(
+        { id: decoded?.id, role: decoded?.role },
+        process.env.JWT_SECRET
+      );
+    }
+
+    res.status(200).json({
+      message: "Refresh token generated successfully",
+      newToken: newToken,
+      newRefreshToken: newRefreshToken,
+    });
+  } catch (error) {
+    res.status(401).send({ message: error.message });
+  }
 }
 
 exports.doctorLogin = async (req, res) => {
@@ -149,10 +192,12 @@ exports.storeLogin = async (req, res) => {
       return res.status(401).json({ message: "Invalid PIN" });
     }
 
-    if (!store.fcmToken.includes(fcmToken)) {
-      store.fcmToken.push(fcmToken);
-      store.changed('fcmToken', true);
-      await store.save();
+    if (fcmToken !== null && fcmToken !== undefined) {
+      if (!store.fcmToken.includes(fcmToken)) {
+        store.fcmToken.push(fcmToken);
+        store.changed('fcmToken', true);
+        await store.save();
+      }
     }
 
     store.currentStoreStatus = "ACTIVE";
@@ -322,29 +367,38 @@ exports.searchCustomerData = async (req, res) => {
         result = patientResult.rows;
         count = patientResult.count;
       } else if (searchQuery.startsWith("SID")) {
-        const storeResult = await Store.findAndCountAll({
+        const storeResult = await Order.findAndCountAll({
           where: {
             [Op.or]: [
-              { title: { [Op.iLike]: `%${searchQuery}%` } },
-              { username: { [Op.iLike]: `%${searchQuery}%` } },
               { SID: { [Op.iLike]: `%${searchQuery}%` } },
             ],
           },
           include: [
             {
-              model: Order,
-              include: [
-                { model: PatientDetails, include: [{ model: PatientAddress }] },
-              ],
+              model: PatientDetails,
+              // include: [
+              //   { model: PatientDetails, include: [{ model: PatientAddress }] },
+              // ],
             },
           ],
-          order: [["createdAt", "DESC"]],
+          group: ['order.SID', 'patientDetail.id', 'order.addressType', "order.premisesNoFloor", "order.premisesName", "order.landmark", 
+            "order.areaRoad", "order.city", "order.pincode", "order.state", "order.phoneNumber2",], 
+          attributes: {
+            include: ['SID', 'addressType'],
+            exclude: ["OID", "isClinic", "isCollect", "isAddress", "payment", "prescription", "orderStatus", "isAccepted", "isPacked", "isCollected",
+              "isDispatched", "isDelivered", "isCancelled", "cancelReason", "doctorName", "filePath", "pdfPath", "acceptTime", "packedTime", 
+              "collectedTime", "dispatchTime", "deliveredTime", "QP", "QD", "PC", "DC", "ET", "S1", "S2", "isOrderEdited", 
+              "balanceDosagePercentage", 
+              "balanceDosageTime", "updatedAt", "DID", "createdAt", "PID"
+            ]
+          },
+          // order: [["createdAt", "DESC"]],
           distinct: true,
           limit,
           offset,
         });
         result = storeResult.rows;
-        count = storeResult.count;
+        count = storeResult.count.length;
       } else {
         const nameResult = await PatientDetails.findAndCountAll({
           where: {

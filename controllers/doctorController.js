@@ -499,7 +499,9 @@ exports.createPdf = async (req, res) => {
 
     const htmlContent = generateHTML(data, doctor);
 
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox']
+    });
     const page = await browser.newPage();
 
     await page.setContent(htmlContent, { waitUntil: "domcontentloaded" });

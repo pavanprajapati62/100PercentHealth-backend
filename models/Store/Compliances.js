@@ -12,15 +12,15 @@ const Compliances = sequelize.define("storeCompliances", {
   },
   gstin: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
   dln: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
   fssaiNo: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
 });
 

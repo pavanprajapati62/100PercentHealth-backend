@@ -51,6 +51,10 @@ const DoctorPublishRecord = sequelize.define("doctorPublishRecord", {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
+  detail: {
+    type: DataTypes.JSONB, 
+    defaultValue: [],
+  },
 });
 
 module.exports = DoctorPublishRecord;

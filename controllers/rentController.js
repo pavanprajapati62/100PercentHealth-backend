@@ -196,8 +196,99 @@ async function getRentOfDoctor(req, res) {
     if (!doctorRent) {
       return res.status(404).json({ error: "No Record Found" });
     }
+
+    const monthMapping = {
+      January: 1,
+      February: 2,
+      March: 3,
+      April: 4,
+      May: 5,
+      June: 6,
+      July: 7,
+      August: 8,
+      September: 9,
+      October: 10,
+      November: 11,
+      December: 12,
+    };
+
+    const monthNumber = monthMapping[month];
+    if (monthNumber === undefined) {
+      return res.status(400).json({ error: "Invalid month provided" });
+    }
+
+    const startDate = new Date(Date.UTC(year, monthNumber  - 1, 1, 0, 0, 0)).toISOString();
+    const endDate = new Date(year, monthNumber, 0, 23, 59, 59, 999);
+    console.log("startDate===", startDate)
+    console.log("endDate===", endDate)
+
+    const orders = await Order.findAll({
+      where: {
+        DID: DID,
+        createdAt: {
+          [Op.between]: [startDate, endDate],
+        },
+        orderStatus: "Delivered"
+      },
+      include: [
+        {
+          model: Billing,
+        },
+        {
+          model: PatientDetails,
+          include: [PatientAddress],
+        },
+        {
+          model: Invoice,
+        },
+        {
+          model: OrderProduct,
+        },
+        {
+          model: Doctor,
+          include: [PersonalInfo, AccountCategory, PaymentDetails],
+        },
+        {
+          model: DoctorOrderMargins, 
+          attributes: ["marginPercentage"], 
+        },
+      ],
+      distinct: true,
+      order: [["createdAt", "ASC"]],
+    });
+
+    const orderData = [];
+    const totalDaysInMonth = new Date(year, monthNumber, 0).getDate(); 
+    
+    for (let day = 1; day <= totalDaysInMonth; day++) {
+      orderData.push({
+        day: day.toString(),
+        orders: 0,
+        amt: 0,
+      });
+    }
+    
+    orders.forEach((order) => {
+      const createdDate = new Date(order.createdAt);  
+      const day = createdDate.getUTCDate();  
+      const invoiceAmount = parseFloat(order?.invoice?.invoiceAmount) || 0; 
+
+      let existingData = orderData.find((item) => {
+        return item.day === day.toString();
+      });
+
+      if (existingData) {
+        existingData.orders += 1;
+        existingData.amt = parseFloat(existingData.amt) + invoiceAmount;
+      }
+    });
+
+    // Sort the orderData by day in ascending order (though it's already in order due to initialization)
+    orderData.sort((a, b) => parseInt(a.day) - parseInt(b.day));
+
     res.status(200).json({
       data: doctorRent,
+      orderData,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -230,20 +321,13 @@ async function getOrdersOfDoctor(req, res) {
       return res.status(400).json({ error: "Invalid month provided" });
     }
 
-    const startDate = new Date(year, monthNumber - 1, 1, 0, 0, 0, 0);
+    const startDate = new Date(Date.UTC(year, monthNumber  - 1, 1, 0, 0, 0)).toISOString();
 
     // Last day of the month at 23:59:59 (Local Time)
     const endDate = new Date(year, monthNumber, 0, 23, 59, 59, 999);
     console.log("startDate=========================", startDate);
     console.log("endDate=========================", endDate);
 
-    // const condition = {
-    //   DID: DID,
-    //   [Op.and]: [
-    //     Sequelize.fn('EXTRACT', 'MONTH', Sequelize.col('createdAt')) == monthNumber,
-    //     Sequelize.fn('EXTRACT', 'YEAR', Sequelize.col('createdAt')) == year,
-    //   ],
-    // };
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
