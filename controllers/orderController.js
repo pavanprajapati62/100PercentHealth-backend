@@ -745,3 +745,27 @@ exports.getPatientByID = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
+
+exports.trackOrder = async (req, res)  => {
+  try{
+    const OID = req.params.id;
+    const order = await Order.findOne({ 
+      where: { OID },
+      include: [ 
+        { model: PatientDetails },
+        { model: Doctor, include: [{ model: PersonalInfo }] },
+        { model: OrderProduct },
+        { model: Invoice },
+        { model: Billing }
+      ] 
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    res.status(200).json(order);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}

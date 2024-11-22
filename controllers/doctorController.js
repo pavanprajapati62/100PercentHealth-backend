@@ -45,6 +45,13 @@ exports.createDoctor = async (req, res) => {
       paymentDetails,
     } = req.body;
 
+    const existingDoctor = await Doctor.findOne({
+      where: { contactNumber: doctorDetails?.contactNumber}
+    })
+    if(existingDoctor) {
+      return res.status(409).json({ error: `Doctor has already been created with this contact number ${doctorDetails?.contactNumber}` });
+    }
+
     // Create doctor
     const doctor = await Doctor.create(doctorDetails);
     const doctorDID = doctor.DID;
