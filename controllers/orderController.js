@@ -756,6 +756,7 @@ exports.trackOrder = async (req, res)  => {
         { model: Doctor, include: [{ model: PersonalInfo }] },
         { model: OrderProduct },
         { model: Invoice },
+        { model: Billing }
       ] 
     });
 
