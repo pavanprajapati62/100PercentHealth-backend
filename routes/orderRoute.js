@@ -9,6 +9,7 @@ const {
   updateOrderStatus,
   cancelOrder,
   getPatientByID,
+  trackOrder,
 } = require("../controllers/orderController");
 const upload = require("../middlewares/uploadImage");
 const { verifyToken, isStoreOrDoctor } = require("../middlewares/roleMiddleware");
@@ -24,5 +25,6 @@ router.put("/:id", [verifyToken, isStoreOrDoctor], updateOrder);
 router.delete("/:id", deleteOrder);
 router.patch("/:id", updateOrderStatus);
 router.patch("/cancel/:id", cancelOrder);
+router.get("/trackOrder/:id", trackOrder)
 
 module.exports = router;

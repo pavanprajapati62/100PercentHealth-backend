@@ -41,8 +41,19 @@ async function generateMonthlyRent() {
         {
           model: Order,
           as: "order",
-          where: { isDelivered: true },
-          attributes: [], // No attributes needed from Order
+          where: {
+            [Op.or]: [
+              {
+                isDelivered: true,
+                deliveredTime: { [Op.between]: [startOfPreviousMonth, endOfPreviousMonth] },
+              },
+              {
+                isCollected: true,
+                collectedTime: { [Op.between]: [startOfPreviousMonth, endOfPreviousMonth] },
+              },
+            ],
+          },
+          attributes: [], 
         },
       ],
       attributes: [
@@ -59,25 +70,23 @@ async function generateMonthlyRent() {
           "totalMarginPercentage",
         ],
       ],
-      where: {
-        createdAt: { [Op.between]: [startOfPreviousMonth, endOfPreviousMonth] },
-      },
       group: ["doctorOrderMargin.DID"], 
     });
-
-    // console.log("doctorMargins=====", doctorMargins)
 
     // 3. Fetch previously undelivered orders that are now delivered from PendingDoctorMargins
     const pendingMargins = await PendingDoctorMargin.findAll({
       include: [
         {
           model: Order,
-          where: { isDelivered: true },
+          where: { 
+            [Op.or]: [
+              { isDelivered: true },
+              { isCollected: true },
+            ],
+           },
         },
       ],
     });
-
-    // console.log("pendingMargins=====", pendingMargins)
 
     // 4. Create rent entries for both DoctorOrderMargins and PendingDoctorMargins data
     const rentData = {};
@@ -98,14 +107,12 @@ async function generateMonthlyRent() {
       if (!rentData[DID]) {
         rentData[DID] = { gateways: 0, fetchedRent: 0 };
       }
-      rentData[DID].gateways += 1; // Each pending order counts as 1 gateway
+      rentData[DID].gateways = Number(rentData[DID].gateways) + 1; 
       rentData[DID].fetchedRent += marginPercentage;
 
-      // Delete processed entry from PendingDoctorMargin
       await PendingDoctorMargin.destroy({ where: { DID, OID } });
     }
 
-    // console.log("rentData=====", rentData)
     // 5. Create DoctorRent entries based on combined data
     const rentPromises = Object.entries(rentData).map(([DID, data]) =>
       DoctorRent.create({
@@ -120,27 +127,35 @@ async function generateMonthlyRent() {
     // 6. Execute all rent creations
     await Promise.all(rentPromises);
 
-    // Step 3: Fetch Pending Doctor Margins
+    // Fetch Pending Doctor Margins to create in PendingDoctorMargins table
     const pendingDoctorMargins = await DoctorOrderMargins.findAll({
       include: [
         {
           model: Order,
-          where: { isDelivered: false, isCancelled: false },
+          where: {
+            [Op.and]: [
+              { isCancelled: false },
+              { isCollected: false },
+              { isDelivered: false },
+              { createdAt: { [Op.between]: [startOfPreviousMonth, endOfPreviousMonth] } },
+            ],
+          },
         },
       ],
-      where: {
-        createdAt: { [Op.between]: [startOfPreviousMonth, endOfPreviousMonth] },
-      },
-      attributes: ["DID", "OID", "marginPercentage"], // Adjusted to only fetch necessary attributes
+      attributes: ["DID", "OID", "marginPercentage"],
     });
 
-    // Step 7: Create Entries in PendingDoctorMargin Table
+    // Create Entries in PendingDoctorMargin Table
     for (const pendingOrder of pendingDoctorMargins) {
-      await PendingDoctorMargin.create({
-        DID: pendingOrder.DID,
-        OID: pendingOrder.OID,
-        marginPercentage: pendingOrder.marginPercentage,
+      const { DID, OID, marginPercentage } = pendingOrder;
+
+      const existingEntry = await PendingDoctorMargin.findOne({
+        where: { DID, OID },
       });
+
+      if (!existingEntry) {
+        await PendingDoctorMargin.create({ DID, OID, marginPercentage });
+      }
     }
   } catch (error) {
     console.error("Error generating monthly rent:", error);

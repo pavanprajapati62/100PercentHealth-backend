@@ -24,7 +24,7 @@ const Doctor = sequelize.define("doctor", {
   contactNumber: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
+    // unique: true,
   },
   pin: {
     type: DataTypes.STRING,
