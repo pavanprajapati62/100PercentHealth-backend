@@ -26,6 +26,7 @@ const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 const DoctorPublishRecord = require("../models/Doctor/DoctorPublishRecord");
 const Invoice = require("../models/Order/Invoice");
+const StoreProduct = require("../models/Product/StoreProduct");
 
 cloudinary.config({
   cloud_name: "dsp7l7i4e",
@@ -184,21 +185,21 @@ exports.updateDoctor = async (req, res) => {
 exports.deleteDoctor = async (req, res) => {
   const DID = req.params.id;
   try {
-    const doctor = await Doctor.destroy({
-      where: { DID: DID },
-    });
+    const doctor = await Doctor.findOne({ where: { DID } });
 
     if (!doctor) {
       return res.status(404).json({ error: "Doctor not found" });
     }
 
-    await Doctor.destroy({ where: { DID } });
+    await PatientDetails.destroy({ where: { DID } });
     await Compliances.destroy({ where: { DID } });
     await AccountCategory.destroy({ where: { DID } });
     await PersonalInfo.destroy({ where: { DID } });
     await ClinicAddress.destroy({ where: { DID } });
     await EmailInfo.destroy({ where: { DID } });
     await PaymentDetails.destroy({ where: { DID } });
+
+    await Doctor.destroy({ where: { DID } });
 
     res.status(200).json({ message: "Doctor deleted successfully" });
   } catch (err) {
@@ -400,7 +401,7 @@ exports.getFrequentProducts = async (req, res) => {
 
       var frequentProducts = await FrequentProducts.findAll({
         where: { DID: id },
-        include: [{ model: Product }],
+        include: [{ model: Product, include: [{ model: StoreProduct }] }],
         order: [["createdAt", "DESC"]],
       });
     } else {

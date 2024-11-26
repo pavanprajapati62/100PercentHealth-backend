@@ -506,9 +506,25 @@ exports.getAllPublishRecords = async (req, res) => {
 exports.updatePublishRecord = async (req, res) => {
   try {
     const id = req.params.id;
-    const { period } = req.body;
+    const { period, DID } = req.body;
     if(period) {
       var [month, year] = period.split(" ");
+    }
+
+    const doctorRentData = await DoctorRent.findOne({
+      where: {
+        DID: DID,
+        month: month,
+        year: year,
+      },
+    });
+
+    if (!doctorRentData) {
+      return res.status(404).json({ error: "No Record Found" });
+    }
+
+    if(doctorRentData?.isPublished === true) {
+      return res.status(400).json({ error: "Record already published" });
     }
 
     let publishRecord = await DoctorPublishRecord.findOne({
@@ -521,6 +537,7 @@ exports.updatePublishRecord = async (req, res) => {
 
     await publishRecord.update(req.body);
 
+    console.log("DID", DID)
     const doctorRent = await DoctorRent.findOne({
       where: { DID, month: month, year: year },
     })

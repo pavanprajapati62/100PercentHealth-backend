@@ -247,7 +247,9 @@ async function getRentOfDoctor(req, res) {
         createdAt: {
           [Op.between]: [startDate, endDate],
         },
-        orderStatus: "Delivered"
+        orderStatus: {
+          [Op.or]: ["Delivered", "Collected"],
+        }
       },
       include: [
         {
@@ -357,7 +359,9 @@ async function getOrdersOfDoctor(req, res) {
         createdAt: {
           [Op.between]: [startDate, endDate],
         },
-        orderStatus: "Delivered"
+        orderStatus: {
+          [Op.or]: ["Delivered", "Collected"],
+        }
       },
       include: [
         {
