@@ -45,14 +45,14 @@ const PersonalInfo = sequelize.define("personalInfo", {
   about1: {
     type: DataTypes.TEXT,
     validate: {
-      len: [0, 120],
+      len: [0, 650],
     },
     allowNull: true,
   },
   about2: {
     type: DataTypes.TEXT,
     validate: {
-      len: [0, 120],
+      len: [0, 650],
     },
     allowNull: true,
   },
