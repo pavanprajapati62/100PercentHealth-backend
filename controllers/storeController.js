@@ -709,7 +709,6 @@ exports.getOrders = async (req, res) => {
         }
       }
     }
-    console.log("whereConditions=====",  whereConditions)
 
     const page = parseInt(req.query.page) || 1;
     const offset = (page - 1) * limit;
@@ -746,15 +745,15 @@ exports.getOrders = async (req, res) => {
     const allCount = await Order.count({ where: { SID, [addressType]: true } });
 
     const clinicCount = await Order.count({
-      where: { SID, [addressType]: true },
+      where: { SID, ["isClinic"]: true },
     });
 
     const collectCount = await Order.count({
-      where: { SID, [addressType]: true },
+      where: { SID, ["isCollect"]: true },
     });
 
     const addressCount = await Order.count({
-      where: { SID, [addressType]: true },
+      where: { SID, ["isAddress"]: true },
     });
 
     const newCount = await Order.count({

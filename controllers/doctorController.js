@@ -407,7 +407,7 @@ exports.getFrequentProducts = async (req, res) => {
     } else {
       var frequentProducts = await FrequentProducts.findAll({
         where: { SID: id },
-        include: [{ model: Product }],
+        include: [{ model: Product, include: [{ model: StoreProduct }] }],
         order: [["createdAt", "DESC"]],
       });
     }
