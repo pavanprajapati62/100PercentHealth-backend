@@ -13,6 +13,7 @@ const Compliances = sequelize.define("storeCompliances", {
   gstin: {
     type: DataTypes.STRING,
     allowNull: true,
+    unique: true,
   },
   dln: {
     type: DataTypes.STRING,

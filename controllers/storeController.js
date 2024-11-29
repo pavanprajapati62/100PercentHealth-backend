@@ -55,7 +55,7 @@ exports.createStore = async (req, res) => {
     console.error("Error creating store:", err);
     res
       .status(500)
-      .json({ error: err?.errors[0]?.message || err });
+      .json({ error: err?.errors[0]?.message ? err?.errors[0]?.message : err });
   }
 };
 
