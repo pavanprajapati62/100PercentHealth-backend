@@ -390,7 +390,7 @@ exports.searchCustomerData = async (req, res) => {
               "isDispatched", "isDelivered", "isCancelled", "cancelReason", "doctorName", "filePath", "pdfPath", "acceptTime", "packedTime", 
               "collectedTime", "dispatchTime", "deliveredTime", "QP", "QD", "PC", "DC", "ET", "S1", "S2", "isOrderEdited", 
               "balanceDosagePercentage", 
-              "balanceDosageTime", "updatedAt", "DID", "createdAt", "PID"
+              "balanceDosageTime", "updatedAt", "DID", "createdAt", "PID", "isPublishedRecord"
             ]
           },
           // order: [["createdAt", "DESC"]],

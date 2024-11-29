@@ -24,6 +24,7 @@ const DoctorOrderMargins = require("../models/Doctor/DoctorOrderMargins");
 const Invoice = require("../models/Order/Invoice");
 const { generateLabelHTML } = require("../pdf/labelhtmlTemplate");
 const puppeteer = require("puppeteer");
+const { sequelize } = require("../config/db");
 const cloudinary = require("cloudinary").v2;
 cloudinary.config({
   cloud_name: "dsp7l7i4e",
@@ -32,30 +33,35 @@ cloudinary.config({
 });
 
 exports.createStore = async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
     const { storeDetails, compliances, address, location, contact, billing } =
       req.body;
 
     // Create Store
-    const store = await Store.create(storeDetails);
+    const store = await Store.create(storeDetails, { transaction });
     const storeId = store.SID;
     if (!storeId) {
       throw new Error("Failed to generate SID for the store.");
     }
     // Create associated records
-    await Compliances.create({ ...compliances, SID: storeId });
-    await Address.create({ ...address, SID: storeId });
-    await Location.create({ ...location, SID: storeId });
-    await Contact.create({ ...contact, SID: storeId });
+    await Promise.all([
+      await Compliances.create({ ...compliances, SID: storeId }, { transaction }),
+      await Address.create({ ...address, SID: storeId }, { transaction }),
+      await Location.create({ ...location, SID: storeId }, { transaction }),
+      await Contact.create({ ...contact, SID: storeId }, { transaction }),
+    ]);
+    await transaction.commit();
 
     res
       .status(201)
       .json({ message: "Store and related details created successfully." });
   } catch (err) {
     console.error("Error creating store:", err);
+    await transaction.rollback();
     res
       .status(500)
-      .json({ error: err?.errors[0]?.message ? err?.errors[0]?.message : err });
+      .json({ error: err?.original ? err?.original?.detail : err?.errors[0]?.message ? err?.errors[0]?.message : err });
   }
 };
 
@@ -213,7 +219,7 @@ exports.updateStore = async (req, res) => {
 
     res.status(200).json({ message: "Store updated successfully" });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error?.original ? error?.original?.detail : error?.errors[0]?.message ? error?.errors[0]?.message : error });
   }
 };
 
