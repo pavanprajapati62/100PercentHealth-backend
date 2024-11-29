@@ -13,6 +13,7 @@ const Compliances = sequelize.define("compliances", {
   gstNumber: {
     type: DataTypes.STRING,
     allowNull: false,
+    unique: true,
   },
   registrationNumber: {
     type: DataTypes.STRING,

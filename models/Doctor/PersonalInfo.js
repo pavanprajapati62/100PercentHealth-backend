@@ -31,7 +31,7 @@ const PersonalInfo = sequelize.define("personalInfo", {
     allowNull: false,
   },
   experience: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.FLOAT,
     allowNull: false,
   },
   operatorName: {

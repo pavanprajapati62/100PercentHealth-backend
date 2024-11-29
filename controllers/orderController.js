@@ -530,6 +530,7 @@ exports.updateOrderStatus = async (req, res) => {
       order.isAccepted = true;
       order.orderStatus = "Accepted";
       order.acceptTime = new Date();
+      console.log("order.acceptTime===", order.acceptTime)
 
       var doctorMargin = await getDoctorMargin(
         orderData.OID,
@@ -541,6 +542,7 @@ exports.updateOrderStatus = async (req, res) => {
       order.isPacked = true;
       order.orderStatus = "Packed";
       order.packedTime = new Date();
+      console.log("order.packedTime===", order.packedTime)
 
       if(order?.isCollect === true) {
         const duration = moment.duration(
@@ -587,6 +589,7 @@ exports.updateOrderStatus = async (req, res) => {
       order.isDispatched = true;
       order.orderStatus = "Dispatched";
       order.dispatchTime = new Date();
+      console.log("order.dispatchTime===", order.dispatchTime)
 
       if(order?.isClinic === true || order?.isAddress === true) {
         const duration = moment.duration(

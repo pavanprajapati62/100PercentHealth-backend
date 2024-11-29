@@ -27,6 +27,7 @@ const fs = require("fs");
 const DoctorPublishRecord = require("../models/Doctor/DoctorPublishRecord");
 const Invoice = require("../models/Order/Invoice");
 const StoreProduct = require("../models/Product/StoreProduct");
+const { sequelize } = require("../config/db");
 
 cloudinary.config({
   cloud_name: "dsp7l7i4e",
@@ -35,6 +36,7 @@ cloudinary.config({
 });
 
 exports.createDoctor = async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
     const {
       doctorDetails,
@@ -54,27 +56,30 @@ exports.createDoctor = async (req, res) => {
     }
 
     // Create doctor
-    const doctor = await Doctor.create(doctorDetails);
+    const doctor = await Doctor.create(doctorDetails, { transaction });
     const doctorDID = doctor.DID;
 
     if (!doctorDID) {
       throw new Error("Failed to generate DID for the doctor.");
     }
 
-    // Create associated records
-    await Compliances.create({ ...compliances, DID: doctorDID });
-    await AccountCategory.create({ ...accountCategory, DID: doctorDID });
-    await PersonalInfo.create({ ...personalInfo, DID: doctorDID });
-    await ClinicAddress.create({ ...clinicAddress, DID: doctorDID });
-    await EmailInfo.create({ ...emailInfo, DID: doctorDID });
-    await PaymentDetails.create({ ...paymentDetails, DID: doctorDID });
+    await Promise.all([
+      Compliances.create({ ...compliances, DID: doctorDID }, { transaction }),
+      AccountCategory.create({ ...accountCategory, DID: doctorDID }, { transaction }),
+      PersonalInfo.create({ ...personalInfo, DID: doctorDID }, { transaction }),
+      ClinicAddress.create({ ...clinicAddress, DID: doctorDID },{ transaction }),
+      EmailInfo.create({ ...emailInfo, DID: doctorDID }, { transaction }),
+      PaymentDetails.create({ ...paymentDetails, DID: doctorDID },{ transaction })
+    ]);
+    await transaction.commit();
 
     res
       .status(201)
       .json({ message: "Doctor and related details created successfully." });
   } catch (err) {
-    console.error("Error creating doctor:", err?.errors[0]?.message);
-    res.status(500).json({ error: err?.errors[0]?.message || err });
+    await transaction.rollback();
+    // console.error("Error creating doctor:", err?.errors[0]?.message);
+    res.status(500).json({ error: err?.errors[0]?.message ? err?.errors[0]?.message : err});
   }
 };
 

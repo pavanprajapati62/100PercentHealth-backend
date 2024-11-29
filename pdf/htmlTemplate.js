@@ -146,7 +146,7 @@ const generateHTML = (data, doctor) => {
                               color: #513e3e;
                             "
                           >
-                            Tel:<b style="font-weight: 600">${contactNumber ? `${contactNumber}`  : ""}</b>
+                          ${contactNumber ? `Tel:<b style="font-weight: 600">${contactNumber}</b>` : ""}
                           </p>
                         </div>
                       </td>
@@ -180,7 +180,7 @@ const generateHTML = (data, doctor) => {
                                     color: #513e3e;
                                   "
                                 >
-                                  ${premisesNo ? `${premisesNo}`  : ""}, ${floor ? `${floor}`  : ""}, ${areaRoad ? `${areaRoad}`  : ""}, ${landmark ? `${landmark}`  : ""},
+                                  ${premisesNo ? `${premisesNo},`  : ""} ${floor ? `${floor},`  : ""} ${areaRoad ? `${areaRoad},`  : ""} ${landmark ? `${landmark}`  : ""}
                                 </p>
                                 <p
                                   style="
@@ -190,7 +190,7 @@ const generateHTML = (data, doctor) => {
                                     color: #513e3e;
                                   "
                                 >
-                                  ${city ? `${city}`  : ""}, ${state ? `${state}`  : ""}, ${pinCode ? `${pinCode}`  : ""}.
+                                  ${city ? `${city},`  : ""} ${state ? `${state},`  : ""} ${pinCode ? `${pinCode}`  : ""}
                                 </p>
                                 <p
                                   style="
@@ -210,7 +210,7 @@ const generateHTML = (data, doctor) => {
                                     color: #513e3e;
                                   "
                                 >
-                                  Tel:<b style="font-weight: 600">${clinicContactNumber ? `${clinicContactNumber}`  : ""}</b>
+                                  ${clinicContactNumber ? `Tel:<b style="font-weight: 600">${clinicContactNumber}</b>` : ""}
                                 </p>
                               </div>
                             </td>
@@ -251,7 +251,7 @@ const generateHTML = (data, doctor) => {
                         color: #513e3e;
                       "
                     >
-                       ${patientPremisesNoFloor ? `${patientPremisesNoFloor}`  : ""}, ${patientAreaRoad ? `${patientAreaRoad}`  : ""}, ${patientLandmark ? `${patientLandmark}`  : ""},
+                       ${patientPremisesNoFloor ? `${patientPremisesNoFloor},`  : ""} ${patientAreaRoad ? `${patientAreaRoad},`  : ""}, ${patientLandmark ? `${patientLandmark},`  : ""}
                     </p>
                     <p
                       style="
@@ -261,7 +261,7 @@ const generateHTML = (data, doctor) => {
                         color: #513e3e;
                       "
                     >
-                      ${patientCity ? `${patientCity}`  : ""}, ${patientState ? `${patientState}`  : ""}, ${patientPincode ? `${patientPincode}`  : ""}.
+                      ${patientCity ? `${patientCity},`  : ""} ${patientState ? `${patientState},`  : ""} ${patientPincode ? `${patientPincode},`  : ""}
                     </p>
                     <p
                       style="
@@ -271,7 +271,7 @@ const generateHTML = (data, doctor) => {
                         color: #513e3e;
                       "
                     >
-                      Tel:<b style="font-weight: 600">${patientPhoneNumber ? `${patientPhoneNumber}`  : ""}</b>
+                    ${patientPhoneNumber ? `Tel:<b style="font-weight: 600">${patientPhoneNumber}</b>` : ""}
                     </p>
                   </div>
                 </td>
