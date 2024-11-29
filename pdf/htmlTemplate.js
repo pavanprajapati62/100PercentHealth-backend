@@ -251,7 +251,7 @@ const generateHTML = (data, doctor) => {
                         color: #513e3e;
                       "
                     >
-                       ${patientPremisesNoFloor ? `${patientPremisesNoFloor},`  : ""} ${patientAreaRoad ? `${patientAreaRoad},`  : ""}, ${patientLandmark ? `${patientLandmark},`  : ""}
+                       ${patientPremisesNoFloor ? `${patientPremisesNoFloor},`  : ""} ${patientAreaRoad ? `${patientAreaRoad},`  : ""} ${patientLandmark ? `${patientLandmark},`  : ""}
                     </p>
                     <p
                       style="

@@ -182,7 +182,7 @@ exports.updateDoctor = async (req, res) => {
 
     res.status(200).json({ message: "Doctor updated successfully" });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error?.original ? error?.original?.detail : error?.errors[0]?.message ? error?.errors[0]?.message : error });
   }
 };
 

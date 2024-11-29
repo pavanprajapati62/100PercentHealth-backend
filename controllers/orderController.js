@@ -48,6 +48,13 @@ const filterOrdersByDosageAndTimeFrame = async (orders) => {
 };
 
 exports.createOrder = async (req, res) => {
+  let createdRecords = {
+    order: null,
+    billing: null,
+    patientDetails: null,
+    patientAddress: null,
+    products: [],
+  };
   try {
     const id = req.userId;
     const {
@@ -94,6 +101,7 @@ exports.createOrder = async (req, res) => {
         ...patient,
         DID: doctor.DID,
       });
+      createdRecords.patientDetails = patientDetails;
     }
 
     const PID = patientDetails.PID;
@@ -123,25 +131,29 @@ exports.createOrder = async (req, res) => {
     });
     const orderOID = order.OID;
 
+    createdRecords.order = order;
+
     if (!orderOID) {
       throw new Error("Failed to generate OID for the order.");
     }
 
-    await Billing.create({ ...billing, OID: orderOID });
+    const billingRecord = await Billing.create({ ...billing, OID: orderOID });
+    createdRecords.billing = billingRecord;
 
     let patientAddress = await PatientAddress.findOne({
       where: { PID: PID },
     });
+    console.log("patientAddress", patientAddress)
 
     if (patientAddress) {
       // Update existing address
       await patientAddress.update({ ...delivery.address });
     } else if (delivery?.address) {
-      // Create new address if it doesn't exist
-      await PatientAddress.create({
+      patientAddress = await PatientAddress.create({
         ...delivery.address,
         PID: patientDetails.PID,
       });
+      createdRecords.patientAddress = patientAddress;
     }
 
     if (products && products.length > 0) {
@@ -151,7 +163,7 @@ exports.createOrder = async (req, res) => {
           OID: orderOID,
           IID: product?.productId,
           SID: store.SID,
-        })
+        }).then((createdProduct) => createdRecords.products.push(createdProduct))
       );
       await Promise.all(productPromises);
     }
@@ -175,6 +187,23 @@ exports.createOrder = async (req, res) => {
 
     res.status(201).json({ message: orderData });
   } catch (err) {
+    if (createdRecords?.products?.length > 0) {
+      await Promise.all(
+        createdRecords.products.map((product) => product.destroy())
+      );
+    }
+    if (createdRecords?.patientAddress) {
+      await createdRecords.patientAddress.destroy();
+    }
+    if (createdRecords?.billing) {
+      await createdRecords.billing.destroy();
+    }
+    if (createdRecords?.order) {
+      await createdRecords.order.destroy();
+    }
+    if (createdRecords?.patientDetails) {
+      await createdRecords.patientDetails.destroy();
+    }
     res.status(500).json({ error: err });
   }
 };
