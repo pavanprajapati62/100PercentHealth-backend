@@ -17,10 +17,10 @@ exports.signUp = async (username, pin) => {
 };
 
 exports.login = async (username, pin) => {
-  const user = await Admin.findOne({ where: { username } });
+  const user = await Admin.findOne({ where: { username: username.toLowerCase()} });
 
   if (!user) {
-    throw new Error("Admin not found.");
+    throw new Error("Username not found.");
   }
 
   const isPinValid = bcrypt.compareSync(pin, user.pin);
