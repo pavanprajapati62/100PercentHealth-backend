@@ -38,6 +38,9 @@ exports.createStore = async (req, res) => {
     const { storeDetails, compliances, address, location, contact, billing } =
       req.body;
 
+    const lowerCaseUsername = storeDetails.username.toLowerCase().trim();
+    storeDetails.username = lowerCaseUsername;
+
     // Create Store
     const store = await Store.create(storeDetails, { transaction });
     const storeId = store.SID;

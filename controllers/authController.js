@@ -18,18 +18,19 @@ const DoctorRent = require("../models/Rent/DoctorRent");
 exports.adminSignUp = async (req, res) => {
   try {
     const { username, pin } = req.body;
-    if (!username || !pin) {
+    const lowerCaseUsername = username.toLowerCase().trim();
+    if (!lowerCaseUsername || !pin) {
       return res
         .status(400)
         .send({ message: "Username and PIN are required." });
     }
 
-    const existingUser = await Admin.findOne({ where: { username } });
+    const existingUser = await Admin.findOne({ where: { username: lowerCaseUsername } });
     if (existingUser) {
       return res.status(400).json({ message: "Username already exist" });
     }
 
-    const user = await authService.signUp(username, pin);
+    const user = await authService.signUp(lowerCaseUsername, pin);
     res.status(201).send(user);
   } catch (error) {
     res.status(500).send({ message: error.message });
@@ -44,8 +45,9 @@ exports.adminLogin = async (req, res) => {
         .status(400)
         .send({ message: "Username and PIN are required." });
     }
+    const lowerCaseUsername = username.toLowerCase().trim();
 
-    const { token, refreshToken } = await authService.login(username, pin);
+    const { token, refreshToken } = await authService.login(lowerCaseUsername, pin);
 
     res.status(200).json({
       message: "Login successful",
@@ -178,7 +180,7 @@ exports.storeLogin = async (req, res) => {
   const { username, pin, fcmToken } = req.body;
 
   try {
-    const store = await Store.findOne({ where: { username } });
+    const store = await Store.findOne({ where: { username: username.toLowerCase().trim() } });
     if (!store) {
       return res.status(404).json({ message: "Store not found" });
     }
