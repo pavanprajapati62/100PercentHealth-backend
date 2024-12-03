@@ -518,15 +518,16 @@ exports.updateOrderStatus = async (req, res) => {
 
     if (isAccepted) {
       for (let i = 0; i < orderData.orderProducts.length; i++) {
-        const { IID, SID, orderQty } = orderData.orderProducts[i];
+        const { IID, SID, orderQty, productName } = orderData.orderProducts[i];
         const storeProduct = await StoreProduct.findOne({
           where: { IID: IID, SID: SID },
+          include: [Product]
         });
         const storeProductData = storeProduct?.get({ plain: true });
 
         if (storeProductData?.storeStock < orderQty) {
           return res.status(404).json({
-            message: `Store ${SID} stock is less than the required units`,
+            message: `Insufficient stock for ${productName} to fulfill the required quantity. Please contact to administration.`
           });
         }
       }

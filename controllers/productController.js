@@ -22,6 +22,13 @@ exports.createProduct = async (req, res) => {
       uom
     } = req.body;
 
+    const existingProduct = await Product.findOne({
+      where: { productName: productName },
+    })
+    if (existingProduct) {
+      return res.status(400).json({ error: "Product already exists" });
+    }
+
     const uniqueStoreIds = [...new Set(storeQty.map((store) => store.storeId))];
 
     const stores = await Store.findAll({

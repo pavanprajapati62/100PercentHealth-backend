@@ -119,7 +119,7 @@ exports.doctorLogin = async (req, res) => {
 
     const doctor = await Doctor.findOne({ where: { contactNumber } });
     if (!doctor) {
-      return res.status(404).json({ message: "Doctor not found" });
+      return res.status(404).json({ message: "Contact number is wrong" });
     }
 
     if (doctor.pin) {
@@ -182,7 +182,7 @@ exports.storeLogin = async (req, res) => {
   try {
     const store = await Store.findOne({ where: { username: username.toLowerCase().trim() } });
     if (!store) {
-      return res.status(404).json({ message: "Store not found" });
+      return res.status(404).json({ message: "Username not found" });
     }
 
     // const isMatch = await bcrypt.compare(pin, store.pin);
