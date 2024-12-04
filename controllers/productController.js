@@ -8,7 +8,7 @@ const OrderProduct = require("../models/Order/Product");
 const Order = require("../models/Order/Order");
 
 exports.createProduct = async (req, res) => {
-  const transaction = await sequelize.transaction();
+  const transaction = await sequelize.transaction({ timeout: 60000 });
   try {
     const {
       productName,
@@ -19,12 +19,16 @@ exports.createProduct = async (req, res) => {
       storeQty,
       marginPercentage,
       pricing,
-      uom
+      uom,
     } = req.body;
+
+    if (!productName || !manufacturer || !units || !type || !storeQty || !pricing || !uom) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
 
     const existingProduct = await Product.findOne({
       where: { productName: productName },
-    })
+    });
     if (existingProduct) {
       return res.status(400).json({ error: "Product already exists" });
     }
@@ -35,17 +39,30 @@ exports.createProduct = async (req, res) => {
       where: {
         SID: uniqueStoreIds,
       },
+      attributes: ["SID"],
     });
 
     const validStoreIds = new Set(stores.map((store) => store.SID));
-
     const invalidStores = uniqueStoreIds.filter(
       (storeId) => !validStoreIds.has(storeId)
     );
 
     if (invalidStores.length > 0) {
+      await transaction.rollback();
       return res.status(400).json({
         error: `Store ID(s) do not exist: ${invalidStores.join(", ")}`,
+      });
+    }
+
+    const totalStoreQty = storeQty.reduce(
+      (total, store) => total + parseInt(store.Qty, 10),
+      0
+    );
+
+    if (totalStoreQty > units) {
+      await transaction.rollback();
+      return res.status(400).json({
+        error: "Total store quantity exceeds available product stock",
       });
     }
 
@@ -72,13 +89,15 @@ exports.createProduct = async (req, res) => {
     const storeProductEntries = storeQty.map((store) => ({
       IID: product.IID,
       SID: store.storeId,
-      // productName: product.productName,
       storeStock: store.Qty,
       units: product.uom,
     }));
-    const storeProductPromise = StoreProduct.bulkCreate(storeProductEntries, { transaction });
 
-    const totalStoreQty = storeQty.reduce((total, store) => total + parseInt(store.Qty, 10), 0);
+    const storeProductPromise = StoreProduct.bulkCreate(
+      storeProductEntries,
+      { transaction }
+    );
+
     const updatedProductStock = product.productStock - totalStoreQty;
 
     const updateProductStockPromise = Product.update(
@@ -86,17 +105,25 @@ exports.createProduct = async (req, res) => {
       { where: { IID: product.IID }, transaction }
     );
 
-    await Promise.all([
-      marginPromise,
-      storeProductPromise,
-      updateProductStockPromise,
-    ]);
+    try {
+      await Promise.all([
+        marginPromise,
+        storeProductPromise,
+        updateProductStockPromise,
+      ]);
+    } catch (error) {
+      await transaction.rollback();
+      return res.status(500).json({ error: "Failed to process product details" });
+    }
 
     await transaction.commit();
-
-   return res.status(201).json({ message: "Product details created successfully." });
+    return res
+      .status(201)
+      .json({ message: "Product details created successfully." });
   } catch (error) {
     await transaction.rollback();
+    const errorMessage = err?.errors?.[0]?.message || err?.message || "An unexpected error occurred.";
+    console.error("Error creating product:", errorMessage);
     return res.status(500).json({ error: error.message });
   }
 };
