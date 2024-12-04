@@ -64,7 +64,7 @@ exports.createProduct = async (req, res) => {
       { transaction }
     );
 
-    await ProductMargin.create(
+    const marginPromise = ProductMargin.create(
       { ...marginPercentage, IID: product.IID },
       { transaction }
     );
@@ -76,22 +76,28 @@ exports.createProduct = async (req, res) => {
       storeStock: store.Qty,
       units: product.uom,
     }));
-    await StoreProduct.bulkCreate(storeProductEntries, { transaction });
+    const storeProductPromise = StoreProduct.bulkCreate(storeProductEntries, { transaction });
 
     const totalStoreQty = storeQty.reduce((total, store) => total + parseInt(store.Qty, 10), 0);
     const updatedProductStock = product.productStock - totalStoreQty;
 
-    await Product.update(
+    const updateProductStockPromise = Product.update(
       { productStock: updatedProductStock },
       { where: { IID: product.IID }, transaction }
     );
 
+    await Promise.all([
+      marginPromise,
+      storeProductPromise,
+      updateProductStockPromise,
+    ]);
+
     await transaction.commit();
 
-    res.status(201).json({ message: "Product details created successfully." });
+   return res.status(201).json({ message: "Product details created successfully." });
   } catch (error) {
     await transaction.rollback();
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 };
 
@@ -247,10 +253,10 @@ exports.updateProduct = async (req, res) => {
       // await product.save();
     }
 
-    res.status(200).json({ message: "Product updated successfully", product });
+    return res.status(200).json({ message: "Product updated successfully", product });
   } catch (error) {
     console.error("Error updating product:", error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 };
 
