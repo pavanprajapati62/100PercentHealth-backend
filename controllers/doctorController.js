@@ -48,14 +48,17 @@ exports.createDoctor = async (req, res) => {
       paymentDetails,
     } = req.body;
 
+    // Check for existing doctor by contact number
     const existingDoctor = await Doctor.findOne({
-      where: { contactNumber: doctorDetails?.contactNumber}
-    })
-    if(existingDoctor) {
-      return res.status(409).json({ error: `Doctor has already been created with this contact number ${doctorDetails?.contactNumber}` });
+      where: { contactNumber: doctorDetails?.contactNumber }
+    });
+    if (existingDoctor) {
+      return res.status(409).json({
+        error: `Doctor has already been created with this contact number ${doctorDetails?.contactNumber}`
+      });
     }
 
-    // Create doctor
+    // Create the doctor
     const doctor = await Doctor.create(doctorDetails, { transaction });
     const doctorDID = doctor.DID;
 
@@ -63,23 +66,39 @@ exports.createDoctor = async (req, res) => {
       throw new Error("Failed to generate DID for the doctor.");
     }
 
+    // Creating related data with transactions
+    const compliancePromise = Compliances.create({ ...compliances, DID: doctorDID }, { transaction });
+    const accountCategoryPromise = AccountCategory.create({ ...accountCategory, DID: doctorDID }, { transaction });
+    const personalInfoPromise = PersonalInfo.create({ ...personalInfo, DID: doctorDID }, { transaction });
+    const clinicAddressPromise = ClinicAddress.create({ ...clinicAddress, DID: doctorDID }, { transaction });
+    const emailInfoPromise = EmailInfo.create({ ...emailInfo, DID: doctorDID }, { transaction });
+    const paymentDetailsPromise = PaymentDetails.create({ ...paymentDetails, DID: doctorDID }, { transaction });
+
+    // Wait for all the promises to resolve
     await Promise.all([
-      Compliances.create({ ...compliances, DID: doctorDID }, { transaction }),
-      AccountCategory.create({ ...accountCategory, DID: doctorDID }, { transaction }),
-      PersonalInfo.create({ ...personalInfo, DID: doctorDID }, { transaction }),
-      ClinicAddress.create({ ...clinicAddress, DID: doctorDID },{ transaction }),
-      EmailInfo.create({ ...emailInfo, DID: doctorDID }, { transaction }),
-      PaymentDetails.create({ ...paymentDetails, DID: doctorDID },{ transaction })
+      compliancePromise,
+      accountCategoryPromise,
+      personalInfoPromise,
+      clinicAddressPromise,
+      emailInfoPromise,
+      paymentDetailsPromise
     ]);
+
+    // Commit the transaction after all related data is created
     await transaction.commit();
 
-    return res
-      .status(201)
-      .json({ message: "Doctor and related details created successfully." });
+    return res.status(201).json({
+      message: "Doctor and related details created successfully."
+    });
   } catch (err) {
+    // Rollback the transaction in case of error
     await transaction.rollback();
-    // console.error("Error creating doctor:", err?.errors[0]?.message);
-    return res.status(500).json({ error: err?.errors[0]?.message ? err?.errors[0]?.message : err});
+    
+    // Handle and log the error properly
+    const errorMessage = err?.errors?.[0]?.message || err?.message || "An unexpected error occurred.";
+    console.error("Error creating doctor:", errorMessage);
+
+    return res.status(500).json({ error: errorMessage });
   }
 };
 
