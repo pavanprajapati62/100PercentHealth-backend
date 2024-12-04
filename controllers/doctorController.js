@@ -73,13 +73,13 @@ exports.createDoctor = async (req, res) => {
     ]);
     await transaction.commit();
 
-    res
+    return res
       .status(201)
       .json({ message: "Doctor and related details created successfully." });
   } catch (err) {
     await transaction.rollback();
     // console.error("Error creating doctor:", err?.errors[0]?.message);
-    res.status(500).json({ error: err?.errors[0]?.message ? err?.errors[0]?.message : err});
+    return res.status(500).json({ error: err?.errors[0]?.message ? err?.errors[0]?.message : err});
   }
 };
 

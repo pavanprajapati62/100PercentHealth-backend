@@ -355,7 +355,7 @@ const generateHTML = (data, doctor) => {
                         width: 250px;
                       "
                     >
-                      Medicine Name5
+                      Medicine Name
                     </th>
                     <th
                       style="
