@@ -36,7 +36,7 @@ cloudinary.config({
 });
 
 exports.createDoctor = async (req, res) => {
-  const transaction = await sequelize.transaction();
+  const transaction = await sequelize.transaction({ timeout: 60000 });
   try {
     const {
       doctorDetails,
@@ -53,6 +53,7 @@ exports.createDoctor = async (req, res) => {
       where: { contactNumber: doctorDetails?.contactNumber }
     });
     if (existingDoctor) {
+      await transaction.rollback();
       return res.status(409).json({
         error: `Doctor has already been created with this contact number ${doctorDetails?.contactNumber}`
       });
@@ -63,7 +64,8 @@ exports.createDoctor = async (req, res) => {
     const doctorDID = doctor.DID;
 
     if (!doctorDID) {
-      throw new Error("Failed to generate DID for the doctor.");
+      await transaction.rollback();
+      return res.status(409).json({ error: "Failed to generate DID for the doctor." });
     }
 
     // Creating related data with transactions

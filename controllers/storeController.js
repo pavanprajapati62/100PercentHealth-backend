@@ -33,40 +33,49 @@ cloudinary.config({
 });
 
 exports.createStore = async (req, res) => {
-  const transaction = await sequelize.transaction();
+  const transaction = await sequelize.transaction({ timeout: 60000 });
   try {
-    const { storeDetails, compliances, address, location, contact, billing } =
-      req.body;
+    const { storeDetails, compliances, address, location, contact, billing } = req.body;
 
+    // Normalize the username to lowercase
     const lowerCaseUsername = storeDetails.username.toLowerCase().trim();
     storeDetails.username = lowerCaseUsername;
 
     // Create Store
     const store = await Store.create(storeDetails, { transaction });
     const storeId = store.SID;
+
     if (!storeId) {
-      throw new Error("Failed to generate SID for the store.");
+      await transaction.rollback();
+      return res.status(409).json({ error: "Failed to generate SID for the store." });
     }
-    // Create associated records
-    await Promise.all([
-      await Compliances.create({ ...compliances, SID: storeId }, { transaction }),
-      await Address.create({ ...address, SID: storeId }, { transaction }),
-      await Location.create({ ...location, SID: storeId }, { transaction }),
-      await Contact.create({ ...contact, SID: storeId }, { transaction }),
-    ]);
+
+    // Create associated records as promises
+    const compliancePromise = Compliances.create({ ...compliances, SID: storeId }, { transaction });
+    const addressPromise = Address.create({ ...address, SID: storeId }, { transaction });
+    const locationPromise = Location.create({ ...location, SID: storeId }, { transaction });
+    const contactPromise = Contact.create({ ...contact, SID: storeId }, { transaction });
+
+    // Wait for all associated records to be created
+    await Promise.all([compliancePromise, addressPromise, locationPromise, contactPromise]);
+
+    // Commit the transaction after all operations are successful
     await transaction.commit();
 
-    res
-      .status(201)
-      .json({ message: "Store and related details created successfully." });
+    return res.status(201).json({
+      message: "Store and related details created successfully."
+    });
   } catch (err) {
-    console.error("Error creating store:", err);
+    // Rollback the transaction if anything fails
     await transaction.rollback();
-    res
-      .status(500)
-      .json({ error: err?.original ? err?.original?.detail : err?.errors[0]?.message ? err?.errors[0]?.message : err });
+    console.error("Error creating store:", err);
+
+    // Return an appropriate error response
+    const errorMessage = err?.original?.detail || err?.errors?.[0]?.message || "An unexpected error occurred.";
+    return res.status(500).json({ error: errorMessage });
   }
 };
+
 
 exports.getAllStores = async (req, res) => {
   try {

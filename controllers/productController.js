@@ -122,7 +122,7 @@ exports.createProduct = async (req, res) => {
       .json({ message: "Product details created successfully." });
   } catch (error) {
     await transaction.rollback();
-    const errorMessage = err?.errors?.[0]?.message || err?.message || "An unexpected error occurred.";
+    const errorMessage = error?.errors?.[0]?.message || error?.message || "An unexpected error occurred.";
     console.error("Error creating product:", errorMessage);
     return res.status(500).json({ error: error.message });
   }
