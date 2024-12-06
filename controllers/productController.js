@@ -50,7 +50,7 @@ exports.createProduct = async (req, res) => {
     if (invalidStores.length > 0) {
       await transaction.rollback();
       return res.status(400).json({
-        error: `Store ID(s) do not exist: ${invalidStores.join(", ")}`,
+        error: `Invalid stores`,
       });
     }
 
@@ -138,7 +138,7 @@ exports.getAllProducts = async (req, res) => {
     const { count, rows: products } = await Product.findAndCountAll({
       where: { isProductDeleted: false},
       include: [{ model: ProductMargin }],
-      order: [["createdAt", "DESC"]],
+      order: [["productName", "ASC"]],
       limit,
       offset,
     });
@@ -184,21 +184,28 @@ exports.getProductById = async (req, res) => {
 
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
-  const { marginPercentage, units, storeQty, ...updatedData } = req.body;
+  const { marginPercentage, units, storeQty, productName, ...updatedData } = req.body;
 
   try {
-    const product = await Product.findOne({
-      where: { IID: id },
-    });
 
+    const [product, existingProduct] = await Promise.all([
+      Product.findOne({ where: { IID: id } }),
+      Product.findOne({ where: { productName: productName, IID: { [Op.ne]: id }  } })
+    ]);
+    
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
+    
+    if (existingProduct) {
+      return res.status(400).json({ error: "Product already exists" });
+    }   
 
     if (units) {
       const newProductStock = units;
       updatedData.units = newProductStock;
       updatedData.productStock = newProductStock;
+      updatedData.productName = productName;
     }
 
     await product.update(updatedData);
@@ -224,7 +231,6 @@ exports.updateProduct = async (req, res) => {
     if (storeProducts.length > 0) {
       totalStoreStockBefore = storeProducts?.reduce((acc, storeProduct) => acc + storeProduct.storeStock, 0);
     }
-    console.log("totalStoreStockBefore=====", totalStoreStockBefore)
 
     if (storeQty) {
       // const updatedStoreQty = [...product?.storeQty];
@@ -335,7 +341,7 @@ exports.searchProduct = async (req, res) => {
         [Op.or]: [{ productName: { [Op.iLike]: `%${searchQuery}%` } }],
       },
       include: [{ model: ProductMargin }, { model: StoreProduct }],
-      order: [["createdAt", "DESC"]],
+      order: [["productName", "ASC"]],
     });
 
     res.status(200).json(products || []);
@@ -356,7 +362,7 @@ exports.searchDrug = async (req, res) => {
           WHERE drug ILIKE '%${searchQuery}%'
         )
       `),
-      order: [["createdAt", "DESC"]],
+      order: [["productName", "ASC"]],
     });
 
     const filteredProducts = products.map((product) => {

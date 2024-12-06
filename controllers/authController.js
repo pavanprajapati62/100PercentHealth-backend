@@ -350,7 +350,7 @@ exports.searchCustomerData = async (req, res) => {
           },
         },
         include: [{ model: PatientAddress }, { model: Order }],
-        order: [["createdAt", "DESC"]],
+        order: [["name", "ASC"]],
       });
       res.status(200).json(phoneResult || []);
     } else {
@@ -362,7 +362,7 @@ exports.searchCustomerData = async (req, res) => {
             },
           },
           include: [{ model: PatientAddress }, { model: Order }],
-          order: [["createdAt", "DESC"]],
+          order: [["name", "ASC"]],
           distinct: true,
           limit,
           offset,
@@ -379,6 +379,7 @@ exports.searchCustomerData = async (req, res) => {
           include: [
             {
               model: PatientDetails,
+              order: [['name', 'ASC']],
               // include: [
               //   { model: PatientDetails, include: [{ model: PatientAddress }] },
               // ],
@@ -399,6 +400,7 @@ exports.searchCustomerData = async (req, res) => {
           distinct: true,
           limit,
           offset,
+          order: [[PatientDetails, 'name', 'ASC']],
         });
         result = storeResult.rows;
         count = storeResult.count.length;
@@ -411,7 +413,7 @@ exports.searchCustomerData = async (req, res) => {
             ],
           },
           include: [{ model: PatientAddress }, { model: Order }],
-          order: [["createdAt", "DESC"]],
+          order: [["name", "ASC"]],
           distinct: true,
           limit,
           offset,
@@ -451,7 +453,7 @@ exports.getAllPatients = async (req, res) => {
       },
       include: [{ model: Order }, { model: PatientAddress }],
       distinct: true,
-      order: [["createdAt", "DESC"]],
+      order: [["name", "ASC"]],
       limit,
       offset,
     });
