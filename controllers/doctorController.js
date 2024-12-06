@@ -55,7 +55,7 @@ exports.createDoctor = async (req, res) => {
     if (existingDoctor) {
       await transaction.rollback();
       return res.status(409).json({
-        error: `Doctor has already been created with this contact number ${doctorDetails?.contactNumber}`
+        error: `Contact number already exists`
       });
     }
 
@@ -93,14 +93,11 @@ exports.createDoctor = async (req, res) => {
       message: "Doctor and related details created successfully."
     });
   } catch (err) {
-    // Rollback the transaction in case of error
     await transaction.rollback();
-    
-    // Handle and log the error properly
     const errorMessage = err?.errors?.[0]?.message || err?.message || "An unexpected error occurred.";
     console.error("Error creating doctor:", errorMessage);
-
-    return res.status(500).json({ error: errorMessage });
+    const message = (errorMessage === "gstNumber must be unique") ? "Gst number already exist in the system." : errorMessage
+    return res.status(500).json({ error: message });
   }
 };
 
@@ -117,7 +114,7 @@ exports.getAllDoctors = async (req, res) => {
         PaymentDetails,
         Order,
       ],
-      order: [["createdAt", "DESC"]],
+      order: [[PersonalInfo, "name", "ASC"]],
     });
     res.status(200).json(doctors);
   } catch (error) {
@@ -203,8 +200,12 @@ exports.updateDoctor = async (req, res) => {
 
     res.status(200).json({ message: "Doctor updated successfully" });
   } catch (error) {
-    res.status(500).json({ error: error?.original ? error?.original?.detail : error?.errors[0]?.message ? error?.errors[0]?.message : error });
-  }
+    const errorMessage = error?.original?.detail 
+    || (error?.errors && error.errors.length > 0 ? error.errors[0].message : error.message) 
+    || "An unexpected error occurred."
+    const message = (errorMessage === "gstNumber must be unique") ? "Gst number already exist in the system." : errorMessage
+    return res.status(500).json({ error: message });
+      }
 };
 
 // Delete Doctor (DELETE request)
@@ -253,7 +254,7 @@ exports.searchDoctor = async (req, res) => {
           model: ClinicAddress,
         },
       ],
-      order: [["createdAt", "DESC"]],
+      order: [[PersonalInfo, "name", "ASC"]],
     });
 
     res.status(200).json(doctors || []);
@@ -428,13 +429,13 @@ exports.getFrequentProducts = async (req, res) => {
       var frequentProducts = await FrequentProducts.findAll({
         where: { DID: id },
         include: [{ model: Product, include: [{ model: StoreProduct }] }],
-        order: [["createdAt", "DESC"]],
+        order: [[Product, "productName", "ASC"]],
       });
     } else {
       var frequentProducts = await FrequentProducts.findAll({
         where: { SID: id },
         include: [{ model: Product, include: [{ model: StoreProduct }] }],
-        order: [["createdAt", "DESC"]],
+        order: [[Product, "productName", "ASC"]],
       });
     }
 

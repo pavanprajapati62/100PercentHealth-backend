@@ -41,6 +41,27 @@ exports.createStore = async (req, res) => {
     const lowerCaseUsername = storeDetails.username.toLowerCase().trim();
     storeDetails.username = lowerCaseUsername;
 
+    const [userName, gstNumber] = await Promise.all([
+      Store.findOne({ where: { username: lowerCaseUsername.toLowerCase() } }),
+      Compliances.findOne({
+        where: {
+          gstin: {
+            [Op.iLike]: compliances.gstin,
+          },
+        },
+      }),
+    ]);
+    
+    if (userName) {
+      await transaction.rollback();
+      return res.status(409).json({ error: "Username already exists." });
+    }
+    
+    if (gstNumber) {
+      await transaction.rollback();
+      return res.status(409).json({ error: "GST number already exists in the system." });
+    }
+
     // Create Store
     const store = await Store.create(storeDetails, { transaction });
     const storeId = store.SID;
@@ -76,12 +97,11 @@ exports.createStore = async (req, res) => {
   }
 };
 
-
 exports.getAllStores = async (req, res) => {
   try {
     const stores = await Store.findAll({
       include: [Compliances, Address, Location, Contact, Order],
-      order: [["createdAt", "DESC"]],
+      order: [["title", "ASC"]],
     });
     res.status(200).json(stores);
   } catch (error) {
@@ -133,10 +153,28 @@ exports.updateStore = async (req, res) => {
     const { storeDetails, compliances, address, location, contact, billing } =
       req.body;
 
-    const store = await Store.findOne({
-      where: { SID },
-    });
-    if (!store) return res.status(404).json({ error: "Store not found" });
+      const lowerCaseUsername = storeDetails.username.toLowerCase().trim();
+      storeDetails.username = lowerCaseUsername;
+
+      const [userName, store, gstNumber] = await Promise.all([
+        Store.findOne({ where: { username: lowerCaseUsername.toLowerCase(), SID: { [Op.ne]: SID } }}),
+        Store.findOne({ where: { SID } }),
+        Compliances.findOne({ where: { gstin: {
+          [Op.iLike]: compliances.gstin,
+        }, SID: { [Op.ne]: SID } }})
+      ]);
+      
+      if (userName) {
+        return res.status(409).json({ error: "Username already exists." });
+      }
+
+      if (gstNumber) {
+        return res.status(409).json({ error: "gst number already exist in the system." });
+      }
+      
+      if (!store) {
+        return res.status(404).json({ error: "Store not found" });
+      }
 
     if (storeDetails?.pin) {
       const token = jwt.sign({ pin: storeDetails.pin }, process.env.JWT_SECRET);
@@ -231,8 +269,12 @@ exports.updateStore = async (req, res) => {
 
     res.status(200).json({ message: "Store updated successfully" });
   } catch (error) {
-    res.status(500).json({ error: error?.original ? error?.original?.detail : error?.errors[0]?.message ? error?.errors[0]?.message : error });
-  }
+    res.status(500).json({
+      error: error?.original?.detail 
+        || (error?.errors && error.errors.length > 0 ? error.errors[0].message : error.message) 
+        || "An unexpected error occurred."
+    });
+      }
 };
 
 exports.assignDoctorToStore = async (req, res) => {
@@ -307,7 +349,7 @@ exports.searchStore = async (req, res) => {
           { username: { [Op.iLike]: `%${searchQuery}%` } },
         ],
       },
-      order: [["createdAt", "DESC"]],
+      order: [["title", "ASC"]],
     });
 
     res.status(200).json(stores || []);
@@ -508,6 +550,7 @@ exports.getDoctorsOfStore = async (req, res) => {
           ],
         },
       ],
+      order: [[Doctor, PersonalInfo, 'name', 'ASC']],
     });
     res.status(200).json(doctors);
   } catch (err) {
@@ -527,7 +570,7 @@ exports.getDoctorsNotAssigned = async (req, res) => {
         EmailInfo,
         PaymentDetails,
       ],
-      order: [["createdAt", "DESC"]],
+      order: [[PersonalInfo, "name", "ASC"]],
     });
     res.status(200).json(doctors);
   } catch (err) {
@@ -556,7 +599,7 @@ exports.getProductsOfDoctor = async (req, res) => {
           where: { isProductDeleted: false }, 
         },
       ],
-      order: [["createdAt", "DESC"]],
+      order: [[Product, "productName", "ASC"]],
     });
     res.status(200).json(products);
   } catch (err) {
@@ -576,7 +619,7 @@ exports.getProductsOfStore = async (req, res) => {
       where: { SID: id },
       attributes: ["storeStock", "units"],
       include: [Product],
-      order: [["createdAt", "DESC"]],
+      order: [[Product, "productName", "ASC"]],
       limit,
       offset,
     });
