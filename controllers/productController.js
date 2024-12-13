@@ -30,6 +30,7 @@ exports.createProduct = async (req, res) => {
       where: { productName: productName },
     });
     if (existingProduct) {
+      await transaction.rollback();
       return res.status(400).json({ error: "Product already exists" });
     }
 
@@ -132,11 +133,26 @@ exports.getAllProducts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
+    const storeId = req?.query?.storeId || null
+    const productId = req?.query?.productId || null
 
     const offset = (page - 1) * limit;
+    const whereConditions = {
+      isProductDeleted: false,
+    };
+    
+    if (productId) {
+      whereConditions.IID = productId; 
+    }
+    
+    if (storeId) {
+      whereConditions.storeQty = {
+        [Sequelize.Op.contains]: [{ storeId: storeId }],
+      };
+    }
 
     const { count, rows: products } = await Product.findAndCountAll({
-      where: { isProductDeleted: false},
+      where: whereConditions,
       include: [{ model: ProductMargin }],
       order: [["productName", "ASC"]],
       limit,
@@ -298,9 +314,24 @@ exports.deleteProduct = async (req, res) => {
 
   try {
     const product = await Product.findByPk(id);
+    const totalStoreStock = await StoreProduct.sum('storeStock', {
+      where: { IID: product.IID },
+    });
 
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
+    }
+
+    if(product.productStock !== 0 && totalStoreStock !== 0) {
+      return res.status(400).json({ message: "Cannot delete. Product and store stock is available." });
+    }
+
+    if(product.productStock !== 0) {
+      return res.status(400).json({ message: "Cannot delete. Product stock is available." });
+    }
+
+    if(totalStoreStock !== 0) {
+      return res.status(400).json({ message: "Cannot delete. Store stock is available." });
     }
 
     const associatedOrders = await OrderProduct.findAll({

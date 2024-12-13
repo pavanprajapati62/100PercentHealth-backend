@@ -32,6 +32,7 @@ const generateProductRows = (products) => {
 
 const generateHTML = (data, doctor) => {
   const doctorName = doctor?.personalInfo?.name
+  const regNo = doctor?.DID
   const personalInfo = doctor?.personalInfo?.qualificationSpecialisation
   const contactNumber = doctor?.contactNumber
   const clinicName = doctor?.personalInfo?.clinicName
@@ -89,6 +90,18 @@ const generateHTML = (data, doctor) => {
       table {
         border-collapse: collapse;
       }
+      .footer {
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        text-align: left;
+      }
+      .footer p {
+        margin: 0;
+        font-size: 14px;
+        color: #9f8383;
+      }
+
     </style>
   </head>
   <body style="margin: 0">
@@ -147,6 +160,16 @@ const generateHTML = (data, doctor) => {
                             "
                           >
                           ${contactNumber ? `Tel:<b style="font-weight: 600">${contactNumber}</b>` : ""}
+                          </p>
+                           <p
+                            style="
+                              margin: 0;
+                              font-size: 14px;
+                              font-weight: 400;
+                              color: #513e3e;
+                            "
+                          >
+                          ${regNo ? `Reg. No.:<b style="font-weight: 600">${regNo}</b>` : ""}
                           </p>
                         </div>
                       </td>
@@ -419,30 +442,11 @@ const generateHTML = (data, doctor) => {
                 </tbody>
               </table>
             </div>
-
+            <div class="footer">
             <table
               style="width: 100%; margin: 0 auto; border-collapse: collapse"
             >
               <tfoot>
-                <tr>
-                  <td
-                    colspan="2"
-                    style="padding-bottom: 50px; text-align: left"
-                  >
-                    <h1
-                      style="
-                        margin: 0 0;
-                        line-height: 35px;
-                        font-size: 30px;
-                        font-weight: 500;
-                        color: #e62121;
-                        text-align: left;
-                      "
-                    >
-                      Next Visit
-                    </h1>
-                  </td>
-                </tr>
                 <tr>
                   <td style="padding: 0">
                     <table
@@ -461,7 +465,7 @@ const generateHTML = (data, doctor) => {
                       </tbody>
                     </table>
                   </td>
-                  <td style="padding: 0">
+                  <td style="padding: 20px">
                     <table
                       style="
                         width: 100%;
@@ -514,6 +518,7 @@ const generateHTML = (data, doctor) => {
                 </tr>
               </tfoot>
             </table>
+            </div>
           </td>
         </tr>
       </table>

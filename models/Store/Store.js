@@ -47,7 +47,6 @@ const Store = sequelize.define("store", {
 });
 
 Store.beforeCreate(async (store) => {
-
   const lastStore = await Store.findOne({
     order: [['SID', 'DESC']],
     attributes: ['SID'],
@@ -56,11 +55,10 @@ Store.beforeCreate(async (store) => {
   let newSID;
 
   if (lastStore && lastStore.SID) {
-    const lastSIDNumber = parseInt(lastStore.SID.slice(3), 10);
-    newSID = `SID${String(lastSIDNumber + 1).padStart(3, '0')}`;
+    const lastSIDNumber = parseInt(lastStore.SID.slice(1), 10);
+    newSID = `S${String(lastSIDNumber + 1).padStart(5, '0')}`; 
   } else {
-    // First time creation, start with SID001
-    newSID = 'SID001';
+    newSID = 'S00001';
   }
 
   const hashedPin = jwt.sign({ pin: store.pin }, process.env.JWT_SECRET);

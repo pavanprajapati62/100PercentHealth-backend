@@ -214,11 +214,10 @@ Order.beforeCreate(async (order) => {
   let newOID;
 
   if (lastOrder && lastOrder.OID) {
-    const lastOIDNumber = parseInt(lastOrder.OID.slice(3), 10);
-    newOID = `OID${String(lastOIDNumber + 1).padStart(3, '0')}`;
+    const lastOIDNumber = parseInt(lastOrder.OID, 10);
+    newOID = (lastOIDNumber + 1).toString();
   } else {
-    // First time creation, start with OID001
-    newOID = 'OID001';
+    newOID = '676876';
   }
 
   order.OID = newOID;

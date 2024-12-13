@@ -30,7 +30,7 @@ const Product = sequelize.define("product", {
       "Drops",
       "Powder",
       "Cream",
-      "Ointment",
+      "Oinment",
       "Other"
     ),
     allowNull: false,
@@ -67,20 +67,18 @@ const Product = sequelize.define("product", {
 });
 
 Product.beforeCreate(async (product) => {
-
-  const lastproduct = await Product.findOne({
+  const lastProduct = await Product.findOne({
     order: [['IID', 'DESC']],
     attributes: ['IID'],
   });
 
   let newIID;
 
-  if (lastproduct && lastproduct.IID) {
-    const lastOIDNumber = parseInt(lastproduct.IID.slice(3), 10);
-    newIID = `IID${String(lastOIDNumber + 1).padStart(3, '0')}`;
+  if (lastProduct && lastProduct.IID) {
+    const lastIIDNumber = parseInt(lastProduct.IID.slice(1), 10); 
+    newIID = `I${String(lastIIDNumber + 1).padStart(5, '0')}`; 
   } else {
-    // First time creation, start with IID001
-    newIID = 'IID001';
+    newIID = 'I00001';
   }
 
   product.IID = newIID;

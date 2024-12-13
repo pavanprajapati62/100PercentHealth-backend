@@ -51,6 +51,15 @@ const StoreBillingDetail = sequelize.define('storeBillingDetail', {
       enable: false,
     }
   },
+  deliveryChargesSameCity: {
+    type: DataTypes.JSON, 
+    allowNull: true,
+    defaultValue: {
+      charges: "",
+      applyBelow: "",
+      enable: false,
+    }
+  },
   noDiscount: {
     type: DataTypes.JSON, 
     allowNull: true,

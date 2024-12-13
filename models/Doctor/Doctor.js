@@ -60,8 +60,6 @@ const Doctor = sequelize.define("doctor", {
 
 // Before creating a doctor, generate a unique DID and hash the pin
 Doctor.beforeCreate(async (doctor) => {
-  // const doctorCount = await Doctor.count();
-  // const newDID = `DID${String(doctorCount + 1).padStart(3, "0")}`;
   const lastDoctor = await Doctor.findOne({
     order: [['DID', 'DESC']],
     attributes: ['DID'],
@@ -70,12 +68,11 @@ Doctor.beforeCreate(async (doctor) => {
   let newDID;
 
   if (lastDoctor && lastDoctor.DID) {
-    const lastDIDNumber = parseInt(lastDoctor.DID.slice(3), 10);
-    newDID = `DID${String(lastDIDNumber + 1).padStart(3, '0')}`;
+    const lastDIDNumber = parseInt(lastDoctor.DID.slice(1), 10); 
+    newDID = `D${String(lastDIDNumber + 1).padStart(5, '0')}`;
   } else {
-    // First time creation, start with DID001
-    newDID = 'DID001';
-  }
+    newDID = 'D45365';
+  }  
 
   const hashedPin = jwt.sign({ pin: doctor.pin }, process.env.JWT_SECRET);
   const hashedPinB = jwt.sign({ pinB: doctor.pinB }, process.env.JWT_SECRET);

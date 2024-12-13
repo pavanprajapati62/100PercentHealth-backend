@@ -42,8 +42,7 @@ Invoice.beforeCreate(async (invoice) => {
     const lastIVIDNumber = parseInt(lastInvoice.IVID.slice(4), 10);
     newIVID = `IVID${String(lastIVIDNumber + 1).padStart(3, "0")}`;
   } else {
-    // First time creation, start with IVID001
-    newIVID = "IVID001";
+    newIVID = 'IVID001';
   }
 
   invoice.IVID = newIVID;
