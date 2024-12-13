@@ -13,6 +13,7 @@ const {
   updateDoctorStatus,
   addProductsToFrequent,
   getFrequentProducts,
+  getFrequentProductsV1,
   removeFrequentProduct,
   getAllOrdersOfDoctor,
   createPdf,
@@ -36,6 +37,7 @@ router.get("/get-publish-record/:id", [verifyToken, isAdminOrDoctor], getPublish
 router.get("/search-doctor", searchDoctor);
 router.get("/get-billing-detail", [verifyToken, isStoreOrDoctor], getBillingDetails);
 router.get("/get-products-frequent/:id", [verifyToken, iAdminOrStoreOrDoctor], getFrequentProducts)
+router.get("/get-products-frequent-v1/:id", [verifyToken, iAdminOrStoreOrDoctor], getFrequentProductsV1)
 router.get("/:id", [verifyToken, isAdminOrDoctor], getDoctorById);
 router.put("/:id", [verifyToken, isAdminOrDoctor], updateDoctor);
 router.delete("/:id", [verifyToken, isAdmin], deleteDoctor);

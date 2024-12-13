@@ -27,9 +27,9 @@ const puppeteer = require("puppeteer");
 const { sequelize } = require("../config/db");
 const cloudinary = require("cloudinary").v2;
 cloudinary.config({
-  cloud_name: "dsp7l7i4e",
-  api_key: "478458651528647",
-  api_secret: "Z1qVxAqDzs51O_A9oTcUKi-DJD4",
+  cloud_name: "dqok82hhy",
+  api_key: "315381883713581",
+  api_secret: "UAwvaQ1JK8x8e_X6nNhh0H8ujmg",
 });
 
 exports.createStore = async (req, res) => {
@@ -205,6 +205,8 @@ exports.updateStore = async (req, res) => {
                 billing.deliveryChargesSameState || null,
               deliveryChargesOtherState:
                 billing.deliveryChargesOtherState || null,
+              deliveryChargesSameCity:
+                billing.deliveryChargesSameCity || null,
               noDiscount: billing.noDiscount || null,
               applyAll: billing.applyAll,
             });
@@ -222,6 +224,9 @@ exports.updateStore = async (req, res) => {
                 deliveryChargesOtherState:
                   billing.deliveryChargesOtherState ||
                   existingStoreBillingDetail.deliveryChargesOtherState,
+                  deliveryChargesSameCity:
+                  billing.deliveryChargesSameCity ||
+                  existingStoreBillingDetail.deliveryChargesSameCity,
                 noDiscount:
                   billing.noDiscount || existingStoreBillingDetail.noDiscount,
                 applyAll: billing.applyAll,
@@ -261,6 +266,10 @@ exports.updateStore = async (req, res) => {
         await updateBillingDetails(
           billing.deliveryChargesOtherState,
           "deliveryChargesOtherState"
+        );
+        await updateBillingDetails(
+          billing.deliveryChargesSameCity,
+          "deliveryChargesSameCity"
         );
         await updateBillingDetails(billing.noDiscount, "noDiscount");
         await updateBillingDetails(billing.applyAll, "applyAll");
@@ -390,6 +399,7 @@ exports.billingStore = async (req, res) => {
       handlingFee,
       deliveryChargesSameState,
       deliveryChargesOtherState,
+      deliveryChargesSameCity,
       applyAll,
     } = req.body;
 
@@ -412,6 +422,9 @@ exports.billingStore = async (req, res) => {
             deliveryChargesOtherState: deliveryChargesOtherState
               ? deliveryChargesOtherState.charges
               : null,
+            deliveryChargesSameCity: deliveryChargesSameCity
+              ? deliveryChargesSameCity.charges
+              : null,
           });
         } else {
           await StoreBillingDetail.update(
@@ -428,6 +441,9 @@ exports.billingStore = async (req, res) => {
               deliveryChargesOtherState: deliveryChargesOtherState
                 ? deliveryChargesOtherState.charges
                 : existingStoreBillingDetail.deliveryChargesOtherState,
+              deliveryChargesSameCity: deliveryChargesSameCity
+                ? deliveryChargesSameCity.charges
+                : existingStoreBillingDetail.deliveryChargesSameCity,
             },
             { where: { SID: store.SID } }
           );
@@ -518,6 +534,28 @@ exports.billingStore = async (req, res) => {
           await StoreBillingDetail.update(
             {
               deliveryChargesOtherState: deliveryChargesOtherState.charges,
+            },
+            { where: { SID: store.SID } }
+          );
+        }
+      }
+
+      if (deliveryChargesSameCity && deliveryChargesSameCity.storeTitle) {
+        const store = await Store.findOne({
+          where: { title: handlingFee.storeTitle },
+        });
+        const existingStoreBillingDetail = await StoreBillingDetail.findOne({
+          where: { SID: store.SID },
+        });
+        if (!existingStoreBillingDetail) {
+          await StoreBillingDetail.create({
+            SID: store.SID,
+            deliveryChargesSameCity: deliveryChargesSameCity.charges,
+          });
+        } else {
+          await StoreBillingDetail.update(
+            {
+              deliveryChargesSameCity: deliveryChargesSameCity.charges,
             },
             { where: { SID: store.SID } }
           );

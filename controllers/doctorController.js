@@ -6,7 +6,7 @@ const ClinicAddress = require("../models/Doctor/ClinicAddress");
 const EmailInfo = require("../models/Doctor/EmailInfo");
 const PaymentDetails = require("../models/Doctor/PaymentDetails");
 const PatientDetails = require("../models/Order/PatientDetails");
-const { Op } = require("sequelize");
+const { Op, fn, col } = require("sequelize");
 const Store = require("../models/Store/Store");
 const Order = require("../models/Order/Order");
 const StoreBillingDetail = require("../models/Store/StoreBillingDetail");
@@ -30,9 +30,9 @@ const StoreProduct = require("../models/Product/StoreProduct");
 const { sequelize } = require("../config/db");
 
 cloudinary.config({
-  cloud_name: "dsp7l7i4e",
-  api_key: "478458651528647",
-  api_secret: "Z1qVxAqDzs51O_A9oTcUKi-DJD4",
+  cloud_name: "dqok82hhy",
+  api_key: "315381883713581",
+  api_secret: "UAwvaQ1JK8x8e_X6nNhh0H8ujmg",
 });
 
 exports.createDoctor = async (req, res) => {
@@ -200,12 +200,12 @@ exports.updateDoctor = async (req, res) => {
 
     res.status(200).json({ message: "Doctor updated successfully" });
   } catch (error) {
-    const errorMessage = error?.original?.detail 
-    || (error?.errors && error.errors.length > 0 ? error.errors[0].message : error.message) 
-    || "An unexpected error occurred."
+    const errorMessage = error?.original?.detail
+      || (error?.errors && error.errors.length > 0 ? error.errors[0].message : error.message)
+      || "An unexpected error occurred."
     const message = (errorMessage === "gstNumber must be unique") ? "Gst number already exist in the system." : errorMessage
     return res.status(500).json({ error: message });
-      }
+  }
 };
 
 // Delete Doctor (DELETE request)
@@ -330,7 +330,7 @@ exports.getBillingDetails = async (req, res) => {
       where: { DID: id },
     });
 
-    if (id.startsWith("DID")) {
+    if (id.startsWith("D")) {
       var store = await Store.findOne({
         where: { SID: doctor.SID },
       });
@@ -420,7 +420,7 @@ exports.getFrequentProducts = async (req, res) => {
     // const id = req.userId;
     const id = req.params.id;
 
-    if (id.startsWith("DID")) {
+    if (id.startsWith("D")) {
       const doctor = await Doctor.findOne({ where: { DID: id } });
       if (!doctor) {
         return res.status(404).json({ message: "Doctor not found" });
@@ -440,6 +440,89 @@ exports.getFrequentProducts = async (req, res) => {
     }
 
     res.status(200).json(frequentProducts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getFrequentProductsV1 = async (req, res) => {
+  try {
+    // const id = req.userId;
+    const id = req.params.id;
+
+    const searchQuery = req.query.search || "";
+    let searchProducts = [];
+    let alternateProducts = [];
+
+    if (id.startsWith("D")) {
+      const doctor = await Doctor.findOne({ where: { DID: id } });
+      if (!doctor) {
+        return res.status(404).json({ message: "Doctor not found" });
+      }
+
+      var frequentProducts = await FrequentProducts.findAll({
+        where: { DID: id },
+        include: [{
+          model: Product,
+          include: [{ model: StoreProduct }]
+        }],
+        order: [[Product, "productName", "ASC"]],
+      });
+      if (searchQuery) {
+        searchProducts = await FrequentProducts.findAll({
+          where: { DID: id },
+          include: [{
+            model: Product,
+            where: { productName: searchQuery },
+            include: [{ model: StoreProduct }]
+          }],
+          order: [[Product, "productName", "ASC"]],
+        });
+
+        if (searchProducts && searchProducts.length > 0) {
+          alternateProducts = await FrequentProducts.findAll({
+            where: { DID: id },
+            include: [
+              {
+                model: Product,
+                where: {
+                  drugs: {
+                    [Op.contains]: searchProducts[0]?.product?.drugs,
+                  },
+                  IID: {
+                    [Op.ne]: searchProducts[0]?.product?.IID, // Exclude the specific IID
+                  },
+                  [Op.and]: [
+                    sequelize.where(
+                      fn('array_length', col('drugs'), 1),
+                      searchProducts[0]?.product?.drugs.length
+                    ),
+                  ],
+                },
+                include: [{ model: StoreProduct }],
+              },
+            ],
+            order: [[{ model: Product }, "productName", "ASC"]],
+          });
+        }
+      }
+
+      return res.status(200).json({
+        frequentProducts,
+        searchProduct: searchProducts.length > 0 ? searchProducts[0] : {},
+        alternateProducts
+      });
+
+    } else {
+      var frequentProducts = await FrequentProducts.findAll({
+        where: { SID: id },
+        include: [{ model: Product, include: [{ model: StoreProduct }] }],
+        order: [[Product, "productName", "ASC"]],
+      });
+      return res.status(200).json(frequentProducts);
+    }
+
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -521,12 +604,12 @@ exports.getAllOrdersOfDoctor = async (req, res) => {
 };
 
 exports.createPdf = async (req, res) => {
-  try { 
+  try {
     const data = req.body;
 
-    const doctor = await Doctor.findOne({ 
+    const doctor = await Doctor.findOne({
       where: { DID: data?.DID },
-      include: [ PersonalInfo, ClinicAddress ] 
+      include: [PersonalInfo, ClinicAddress]
     });
 
     const htmlContent = generateHTML(data, doctor);

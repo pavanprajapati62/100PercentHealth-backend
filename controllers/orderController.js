@@ -69,7 +69,7 @@ exports.createOrder = async (req, res) => {
       pdfPath,
     } = req.body;
 
-    if (id.startsWith("DID")) {
+    if (id.startsWith("D")) {
       var doctor = await Doctor.findOne({
         where: { DID: id },
       });
@@ -341,7 +341,7 @@ exports.updateOrder = async (req, res) => {
     });
 
     if (id) {
-      if (id.startsWith("SID")) {
+      if (id.startsWith("S")) {
         await order.update({
           isOrderEdited: true,
         });

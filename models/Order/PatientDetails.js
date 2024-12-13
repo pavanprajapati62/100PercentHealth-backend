@@ -40,7 +40,6 @@ const PatientDetails = sequelize.define("patientDetails", {
 });
 
 PatientDetails.beforeCreate(async (patient) => {
-
   const lastPatient = await PatientDetails.findOne({
     order: [['PID', 'DESC']],
     attributes: ['PID'],
@@ -49,13 +48,12 @@ PatientDetails.beforeCreate(async (patient) => {
   let newPID;
 
   if (lastPatient && lastPatient.PID) {
-    const lastPIDNumber = parseInt(lastPatient.PID.slice(3), 10);
-    newPID = `PID${String(lastPIDNumber + 1).padStart(3, '0')}`;
+    const lastPIDNumber = parseInt(lastPatient.PID.slice(1), 10);
+    newPID = `P${String(lastPIDNumber + 1).padStart(5, '0')}`;
   } else {
-    // First time creation, start with PID001
-    newPID = 'PID001';
+    newPID = 'P45365';
   }
-
+  
   patient.PID = newPID;
 });
 

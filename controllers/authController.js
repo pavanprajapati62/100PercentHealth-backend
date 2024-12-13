@@ -254,7 +254,7 @@ exports.searchOrderData = async (req, res) => {
     let result = [];
     let count = 0;
 
-    if (searchQuery.startsWith("DID")) {
+    if (searchQuery.startsWith("D")) {
       const doctorResult = await Order.findAndCountAll({
         where: {
           DID: {
@@ -276,7 +276,7 @@ exports.searchOrderData = async (req, res) => {
       count = doctorResult.count;
     }
 
-    if (searchQuery.startsWith("OID")) {
+  
       const orderResult = await Order.findAndCountAll({
         where: {
           OID: {
@@ -296,9 +296,9 @@ exports.searchOrderData = async (req, res) => {
       });
       result = orderResult.rows;
       count = orderResult.count;
-    }
+  
 
-    if (searchQuery.startsWith("PID")) {
+    if (searchQuery.startsWith("P")) {
       const patientResult = await Order.findAndCountAll({
         where: {
           PID: {
@@ -354,7 +354,7 @@ exports.searchCustomerData = async (req, res) => {
       });
       res.status(200).json(phoneResult || []);
     } else {
-      if (searchQuery.startsWith("PID")) {
+      if (searchQuery.startsWith("P")) {
         const patientResult = await PatientDetails.findAndCountAll({
           where: {
             PID: {
@@ -369,7 +369,7 @@ exports.searchCustomerData = async (req, res) => {
         });
         result = patientResult.rows;
         count = patientResult.count;
-      } else if (searchQuery.startsWith("SID")) {
+      } else if (searchQuery.startsWith("S")) {
         const storeResult = await Order.findAndCountAll({
           where: {
             [Op.or]: [
