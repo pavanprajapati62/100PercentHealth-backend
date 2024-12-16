@@ -32,7 +32,7 @@ const generateProductRows = (products) => {
 
 const generateHTML = (data, doctor) => {
   const doctorName = doctor?.personalInfo?.name
-  const regNo = doctor?.DID
+  const regNo = doctor?.compliance?.registrationNumber
   const personalInfo = doctor?.personalInfo?.qualificationSpecialisation
   const contactNumber = doctor?.contactNumber
   const clinicName = doctor?.personalInfo?.clinicName

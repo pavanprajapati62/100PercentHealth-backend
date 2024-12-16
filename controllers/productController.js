@@ -1,5 +1,6 @@
 const { Op, Sequelize } = require("sequelize");
 const Product = require("../models/Product/Product");
+const Drug = require("../models/Product/Drug");
 const StoreProduct = require("../models/Product/StoreProduct");
 const Store = require("../models/Store/Store");
 const ProductMargin = require("../models/Product/ProductMargin");
@@ -135,10 +136,14 @@ exports.getAllProducts = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const storeId = req?.query?.storeId || null
     const productId = req?.query?.productId || null
+    const searchQuery = req.query.search || "";
 
     const offset = (page - 1) * limit;
     const whereConditions = {
       isProductDeleted: false,
+        [Op.or]: [
+          { productName: { [Op.iLike]: `%${searchQuery}%` } },
+        ]
     };
     
     if (productId) {
@@ -410,5 +415,83 @@ exports.searchDrug = async (req, res) => {
     res.status(200).json(filteredProducts || []);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+exports.createDrug = async (req, res) => {
+  try {
+    const { drugName } = req.body;
+     await Drug.create({ drugName });
+
+    return res
+      .status(201)
+      .json({ message: "Drug created successfully." });
+  } catch (error) {
+    const errorMessage = error?.errors?.[0]?.message || error?.message || "An unexpected error occurred.";
+    console.error("Error creating drug:", errorMessage);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateDrug = async (req, res) => {
+  try {
+    const { id } = req.params; 
+    const { drugName } = req.body; 
+    const drug = await Drug.findByPk(id);
+    if (!drug) {
+      return res.status(404).json({ message: "Drug not found" });
+    }
+    await drug.update({ drugName });
+    return res.status(200).json({ message: "Drug updated successfully." });
+  } catch (error) {
+    const errorMessage = error?.errors?.[0]?.message || error?.message || "An unexpected error occurred.";
+    console.error("Error updating drug:", errorMessage);
+    return res.status(500).json({ error: errorMessage });
+  }
+};
+
+exports.getAllDrugs = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const searchQuery = req.query.search || "";
+
+    const offset = (page - 1) * limit;
+    const whereConditions = {
+        [Op.or]: [
+          { drugName: { [Op.iLike]: `%${searchQuery}%` } },
+        ]
+    };
+    
+    const { count, rows: drugs } = await Drug.findAndCountAll({
+      where: whereConditions,
+      order: [["drugName", "ASC"]],
+      limit,
+      offset,
+    });
+
+    res.status(200).json({
+      currentPage: page,
+      limit,
+      totalItems: count,
+      totalPages: Math.ceil(count / limit),
+      drugs: drugs,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.deleteDrug = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const drug = await Drug.findByPk(id);
+    if (!drug) {
+      return res.status(404).json({ message: "Drug not found" });
+    }
+    await Drug.destroy({ where: { id } });
+    return res.status(200).json({ message: "Drug deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
 };
