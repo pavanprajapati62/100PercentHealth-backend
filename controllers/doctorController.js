@@ -453,35 +453,40 @@ exports.getFrequentProductsV1 = async (req, res) => {
     const searchQuery = req.query.search || "";
     let searchProducts = [];
     let alternateProducts = [];
+    let whereCondition = []
 
     if (id.startsWith("D")) {
       const doctor = await Doctor.findOne({ where: { DID: id } });
       if (!doctor) {
         return res.status(404).json({ message: "Doctor not found" });
       }
-
+      whereCondition = { DID: id }
+    } else {
+      whereCondition = { SID: id }
+    }
       var frequentProducts = await FrequentProducts.findAll({
-        where: { DID: id },
+        where: whereCondition,
         include: [{
           model: Product,
           include: [{ model: StoreProduct }]
         }],
         order: [[Product, "productName", "ASC"]],
       });
+
       if (searchQuery) {
         searchProducts = await FrequentProducts.findAll({
-          where: { DID: id },
+          where: whereCondition,
           include: [{
             model: Product,
-            where: { productName: searchQuery },
+            where: { productName: { [Op.iLike]: `%${searchQuery}%` } },
             include: [{ model: StoreProduct }]
           }],
           order: [[Product, "productName", "ASC"]],
         });
 
-        if (searchProducts && searchProducts.length > 0) {
+        if (searchProducts && searchProducts.length == 1) {
           alternateProducts = await FrequentProducts.findAll({
-            where: { DID: id },
+            where: whereCondition,
             include: [
               {
                 model: Product,
@@ -509,19 +514,9 @@ exports.getFrequentProductsV1 = async (req, res) => {
 
       return res.status(200).json({
         frequentProducts,
-        searchProduct: searchProducts.length > 0 ? searchProducts[0] : {},
+        searchProducts,
         alternateProducts
       });
-
-    } else {
-      var frequentProducts = await FrequentProducts.findAll({
-        where: { SID: id },
-        include: [{ model: Product, include: [{ model: StoreProduct }] }],
-        order: [[Product, "productName", "ASC"]],
-      });
-      return res.status(200).json(frequentProducts);
-    }
-
 
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -609,7 +604,7 @@ exports.createPdf = async (req, res) => {
 
     const doctor = await Doctor.findOne({
       where: { DID: data?.DID },
-      include: [PersonalInfo, ClinicAddress]
+      include: [PersonalInfo, ClinicAddress, Compliances]
     });
 
     const htmlContent = generateHTML(data, doctor);

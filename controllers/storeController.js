@@ -51,12 +51,12 @@ exports.createStore = async (req, res) => {
         },
       }),
     ]);
-    
+
     if (userName) {
       await transaction.rollback();
       return res.status(409).json({ error: "Username already exists." });
     }
-    
+
     if (gstNumber) {
       await transaction.rollback();
       return res.status(409).json({ error: "GST number already exists in the system." });
@@ -153,17 +153,22 @@ exports.updateStore = async (req, res) => {
     const { storeDetails, compliances, address, location, contact, billing } =
       req.body;
 
-      const lowerCaseUsername = storeDetails.username.toLowerCase().trim();
+    if (storeDetails) {
+      const lowerCaseUsername = storeDetails?.username.toLowerCase().trim();
       storeDetails.username = lowerCaseUsername;
 
       const [userName, store, gstNumber] = await Promise.all([
-        Store.findOne({ where: { username: lowerCaseUsername.toLowerCase(), SID: { [Op.ne]: SID } }}),
+        Store.findOne({ where: { username: lowerCaseUsername.toLowerCase(), SID: { [Op.ne]: SID } } }),
         Store.findOne({ where: { SID } }),
-        Compliances.findOne({ where: { gstin: {
-          [Op.iLike]: compliances.gstin,
-        }, SID: { [Op.ne]: SID } }})
+        Compliances.findOne({
+          where: {
+            gstin: {
+              [Op.iLike]: compliances.gstin,
+            }, SID: { [Op.ne]: SID }
+          }
+        })
       ]);
-      
+
       if (userName) {
         return res.status(409).json({ error: "Username already exists." });
       }
@@ -171,22 +176,25 @@ exports.updateStore = async (req, res) => {
       if (gstNumber) {
         return res.status(409).json({ error: "gst number already exist in the system." });
       }
-      
+
       if (!store) {
         return res.status(404).json({ error: "Store not found" });
       }
 
-    if (storeDetails?.pin) {
-      const token = jwt.sign({ pin: storeDetails.pin }, process.env.JWT_SECRET);
-      storeDetails.pin = token;
+      if (storeDetails?.pin) {
+        const token = jwt.sign({ pin: storeDetails.pin }, process.env.JWT_SECRET);
+        storeDetails.pin = token;
+      }
+
+      await Promise.all([
+        store.update(storeDetails),
+        Compliances.update(compliances, { where: { SID } }),
+        Address.update(address, { where: { SID } }),
+        Location.update(location, { where: { SID } }),
+        Contact.update(contact, { where: { SID } }),
+      ]);
+
     }
-
-    await store.update(storeDetails);
-    await Compliances.update(compliances, { where: { SID } });
-    await Address.update(address, { where: { SID } });
-    await Location.update(location, { where: { SID } });
-    await Contact.update(contact, { where: { SID } });
-
     if (billing) {
       if (billing.applyAll) {
         const allStores = await Store.findAll();
@@ -224,7 +232,7 @@ exports.updateStore = async (req, res) => {
                 deliveryChargesOtherState:
                   billing.deliveryChargesOtherState ||
                   existingStoreBillingDetail.deliveryChargesOtherState,
-                  deliveryChargesSameCity:
+                deliveryChargesSameCity:
                   billing.deliveryChargesSameCity ||
                   existingStoreBillingDetail.deliveryChargesSameCity,
                 noDiscount:
@@ -239,19 +247,19 @@ exports.updateStore = async (req, res) => {
         const updateBillingDetails = async (billingField, fieldName) => {
           if (billingField) {
             const existingStoreBillingDetail = await StoreBillingDetail.findOne(
-              { where: { SID: store.SID } }
+              { where: { SID: SID } }
             );
 
             if (!existingStoreBillingDetail) {
               const newBillingDetail = {};
               newBillingDetail[fieldName] = billingField;
-              newBillingDetail.SID = store.SID;
+              newBillingDetail.SID = SID;
               await StoreBillingDetail.create(newBillingDetail);
             } else {
               const updateData = {};
               updateData[fieldName] = billingField;
               await StoreBillingDetail.update(updateData, {
-                where: { SID: store.SID },
+                where: { SID: SID },
               });
             }
           }
@@ -279,11 +287,11 @@ exports.updateStore = async (req, res) => {
     res.status(200).json({ message: "Store updated successfully" });
   } catch (error) {
     res.status(500).json({
-      error: error?.original?.detail 
-        || (error?.errors && error.errors.length > 0 ? error.errors[0].message : error.message) 
+      error: error?.original?.detail
+        || (error?.errors && error.errors.length > 0 ? error.errors[0].message : error.message)
         || "An unexpected error occurred."
     });
-      }
+  }
 };
 
 exports.assignDoctorToStore = async (req, res) => {
@@ -634,7 +642,7 @@ exports.getProductsOfDoctor = async (req, res) => {
       include: [
         {
           model: Product,
-          where: { isProductDeleted: false }, 
+          where: { isProductDeleted: false },
         },
       ],
       order: [[Product, "productName", "ASC"]],
@@ -791,13 +799,13 @@ exports.getOrders = async (req, res) => {
         if (orderType === "isPacked") {
           whereConditions.orderStatus = "Packed";
         } else if (orderType === "isDispatched") {
-          if(addressType === "isCollect") {
+          if (addressType === "isCollect") {
             whereConditions = { OID: null };
           } else {
             whereConditions.orderStatus = "Dispatched";
           }
         } else if (orderType === "isDelivered") {
-          if(addressType === "isCollect") {
+          if (addressType === "isCollect") {
             whereConditions = { OID: null };
           } else {
             whereConditions.orderStatus = "Delivered";
@@ -945,7 +953,7 @@ exports.getOrdersWithoutCancel = async (req, res) => {
       limit,
       offset,
     });
-    
+
     res.status(200).json({
       currentPage: page,
       limit,
