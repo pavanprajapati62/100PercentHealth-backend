@@ -30,9 +30,13 @@ const StoreProduct = require("../models/Product/StoreProduct");
 const { sequelize } = require("../config/db");
 
 cloudinary.config({
-  cloud_name: "dqok82hhy",
-  api_key: "315381883713581",
-  api_secret: "UAwvaQ1JK8x8e_X6nNhh0H8ujmg",
+  // cloud_name: "dqok82hhy",
+  // api_key: "315381883713581",
+  // api_secret: "UAwvaQ1JK8x8e_X6nNhh0H8ujmg",
+
+  cloud_name:"diwtdktzc",
+  api_key:"211218781222369",
+  api_secret:"xbPZxQl7qFKX9nJXuTeMQ6wzXNA",
 });
 
 exports.createDoctor = async (req, res) => {
@@ -447,22 +451,20 @@ exports.getFrequentProducts = async (req, res) => {
 
 exports.getFrequentProductsV1 = async (req, res) => {
   try {
-    // const id = req.userId;
     const id = req.params.id;
-
     const searchQuery = req.query.search || "";
     let searchProducts = [];
     let alternateProducts = [];
-    let whereCondition = []
+    let SID = id;
+    let whereCondition = { SID : id }
 
     if (id.startsWith("D")) {
       const doctor = await Doctor.findOne({ where: { DID: id } });
       if (!doctor) {
         return res.status(404).json({ message: "Doctor not found" });
       }
-      whereCondition = { DID: id }
-    } else {
-      whereCondition = { SID: id }
+      whereCondition = { DID: id}
+      SID = doctor.SID
     }
       var frequentProducts = await FrequentProducts.findAll({
         where: whereCondition,
@@ -474,19 +476,18 @@ exports.getFrequentProductsV1 = async (req, res) => {
       });
 
       if (searchQuery) {
-        searchProducts = await FrequentProducts.findAll({
-          where: whereCondition,
+        searchProducts = await StoreProduct.findAll({
+          where: {SID: SID},
           include: [{
             model: Product,
             where: { productName: { [Op.iLike]: `%${searchQuery}%` } },
-            include: [{ model: StoreProduct }]
           }],
           order: [[Product, "productName", "ASC"]],
         });
 
         if (searchProducts && searchProducts.length == 1) {
-          alternateProducts = await FrequentProducts.findAll({
-            where: whereCondition,
+          alternateProducts = await StoreProduct.findAll({
+            where: {SID: SID},
             include: [
               {
                 model: Product,
@@ -495,7 +496,7 @@ exports.getFrequentProductsV1 = async (req, res) => {
                     [Op.contains]: searchProducts[0]?.product?.drugs,
                   },
                   IID: {
-                    [Op.ne]: searchProducts[0]?.product?.IID, // Exclude the specific IID
+                    [Op.ne]: searchProducts[0]?.product?.IID,
                   },
                   [Op.and]: [
                     sequelize.where(
@@ -504,7 +505,6 @@ exports.getFrequentProductsV1 = async (req, res) => {
                     ),
                   ],
                 },
-                include: [{ model: StoreProduct }],
               },
             ],
             order: [[{ model: Product }, "productName", "ASC"]],

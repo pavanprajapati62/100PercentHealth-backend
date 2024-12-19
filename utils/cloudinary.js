@@ -2,9 +2,12 @@ const cloudinary = require("cloudinary");
 const fs = require("fs");
 
 cloudinary.config({
-  cloud_name: "dqok82hhy",
-  api_key: "315381883713581",
-  api_secret: "UAwvaQ1JK8x8e_X6nNhh0H8ujmg",
+  // cloud_name: "dqok82hhy",
+  // api_key: "315381883713581",
+  // api_secret: "UAwvaQ1JK8x8e_X6nNhh0H8ujmg",
+  cloud_name:"diwtdktzc",
+  api_key:"211218781222369",
+  api_secret:"xbPZxQl7qFKX9nJXuTeMQ6wzXNA",
 });
 
 const cloudinaryUploadImage = async (fileToUploads) => {
