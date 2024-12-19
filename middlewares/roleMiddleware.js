@@ -73,7 +73,7 @@ const isStoreOrDoctor = (req, res, next) => {
   }
 };
 
-const iAdminOrStoreOrDoctor = (req, res, next) => {
+const isAdminOrStoreOrDoctor = (req, res, next) => {
   if (req.userRole === "admin" || req.userRole === "store" || req.userRole === "doctor") {
     next();
   } else {
@@ -81,4 +81,4 @@ const iAdminOrStoreOrDoctor = (req, res, next) => {
   }
 };
 
-module.exports = { verifyToken, isAdmin, isDoctor, isStore, isAdminOrDoctor, isStoreOrAdmin, isStoreOrDoctor, iAdminOrStoreOrDoctor };
+module.exports = { verifyToken, isAdmin, isDoctor, isStore, isAdminOrDoctor, isStoreOrAdmin, isStoreOrDoctor, isAdminOrStoreOrDoctor };
