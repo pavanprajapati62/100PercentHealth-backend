@@ -2,6 +2,11 @@ const { DataTypes } = require("sequelize");
 const { sequelize } = require("../../config/db");
 
 const DoctorRent = sequelize.define("doctorRent", {
+  FID: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true,
+  },
   DID: {
     type: DataTypes.STRING,
     references: {
@@ -30,6 +35,24 @@ const DoctorRent = sequelize.define("doctorRent", {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   }
+});
+
+DoctorRent.beforeCreate(async (doctorRent) => {
+  const lastDoctorRent = await DoctorRent.findOne({
+    order: [['FID', 'DESC']],
+    attributes: ['FID'],
+  });
+
+  let newFID;
+
+  if (lastDoctorRent && lastDoctorRent.FID) {
+    const lastFIDNumber = parseInt(lastDoctorRent.FID.slice(1), 10); 
+    newFID = `F${String(lastFIDNumber + 1).padStart(5, '0')}`;
+  } else {
+    newFID = 'F00001';
+  }  
+
+  doctorRent.FID = newFID;
 });
 
 module.exports = DoctorRent;
