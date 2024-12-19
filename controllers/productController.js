@@ -158,7 +158,7 @@ exports.getAllProducts = async (req, res) => {
 
     const { count, rows: products } = await Product.findAndCountAll({
       where: whereConditions,
-      include: [{ model: ProductMargin }],
+      include: [{ model: ProductMargin },{ model: StoreProduct }],
       order: [["productName", "ASC"]],
       limit,
       offset,
@@ -421,11 +421,10 @@ exports.searchDrug = async (req, res) => {
 exports.createDrug = async (req, res) => {
   try {
     const { drugName } = req.body;
-     await Drug.create({ drugName });
-
+    const drugData = await Drug.create({ drugName });
     return res
       .status(201)
-      .json({ message: "Drug created successfully." });
+      .json(drugData);
   } catch (error) {
     const errorMessage = error?.errors?.[0]?.message || error?.message || "An unexpected error occurred.";
     console.error("Error creating drug:", errorMessage);
