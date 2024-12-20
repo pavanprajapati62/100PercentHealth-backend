@@ -274,31 +274,7 @@ exports.searchOrderData = async (req, res) => {
       });
       result = doctorResult.rows;
       count = doctorResult.count;
-    }
-
-  
-      const orderResult = await Order.findAndCountAll({
-        where: {
-          OID: {
-            [Op.iLike]: `%${searchQuery}%`,
-          },
-        },
-        include: [
-          { model: Doctor, include: [{ model: PersonalInfo }] },
-          { model: PatientDetails },
-          { model: DoctorOrderMargins },
-          { model: Invoice }
-        ],
-        order: [["createdAt", "DESC"]],
-        distinct: true,
-        limit,
-        offset,
-      });
-      result = orderResult.rows;
-      count = orderResult.count;
-  
-
-    if (searchQuery.startsWith("P")) {
+    } else if (searchQuery.startsWith("P")) {
       const patientResult = await Order.findAndCountAll({
         where: {
           PID: {
@@ -318,7 +294,28 @@ exports.searchOrderData = async (req, res) => {
       });
       result = patientResult.rows;
       count = patientResult.count;
+    } else {
+      const orderResult = await Order.findAndCountAll({
+        where: {
+          OID: {
+            [Op.iLike]: `%${searchQuery}%`,
+          },
+        },
+        include: [
+          { model: Doctor, include: [{ model: PersonalInfo }] },
+          { model: PatientDetails },
+          { model: DoctorOrderMargins },
+          { model: Invoice }
+        ],
+        order: [["createdAt", "DESC"]],
+        distinct: true,
+        limit,
+        offset,
+      });
+      result = orderResult.rows;
+      count = orderResult.count;
     }
+    
     res.status(200).json({
       currentPage: page,
       limit,

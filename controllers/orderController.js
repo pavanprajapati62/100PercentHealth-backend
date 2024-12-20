@@ -210,6 +210,7 @@ exports.createOrder = async (req, res) => {
 
 exports.uploadImage = async (req, res) => {
   try {
+    let url = "";
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
@@ -218,14 +219,22 @@ exports.uploadImage = async (req, res) => {
     if (locaFilePath) {
       var result = await cloudinaryUploadImage(locaFilePath);
       await fs.unlink(locaFilePath);
+      url = result?.url
     }
 
-    res.status(200).json({
-      message: "File uploaded successfully",
-      filePath: result?.url,
+    if(url) {
+      return res.status(200).json({
+        message: "File uploaded successfully",
+        filePath: url,
+      });
+    }
+
+    return res.status(400).json({
+      message: "Failed to upload file.",
     });
+   
   } catch (error) {
-    res.status(500).json({ error: error });
+   return res.status(500).json({ error: error });
   }
 };
 

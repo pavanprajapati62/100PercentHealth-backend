@@ -150,19 +150,35 @@ exports.getAllProducts = async (req, res) => {
       whereConditions.IID = productId; 
     }
     
-    if (storeId) {
-      whereConditions.storeQty = {
-        [Sequelize.Op.contains]: [{ storeId: storeId }],
-      };
-    }
+    // if (storeId) {
+    //   whereConditions.storeQty = {
+    //     [Sequelize.Op.contains]: [{ storeId: storeId }],
+    //   };
+    // }
+
+    // const { count, rows: products } = await Product.findAndCountAll({
+    //   where: whereConditions,
+    //   include: [{ model: ProductMargin },{ model: StoreProduct }],
+    //   order: [["productName", "ASC"]],
+    //   distinct: true,
+    //   limit,
+    //   offset,
+    // });
 
     const { count, rows: products } = await Product.findAndCountAll({
       where: whereConditions,
-      include: [{ model: ProductMargin },{ model: StoreProduct }],
+      include: [
+        { model: ProductMargin },
+        {
+          model: StoreProduct,
+          where: storeId ? { SID: storeId } : undefined,
+        },
+      ],
       order: [["productName", "ASC"]],
+      distinct: true,
       limit,
       offset,
-    });
+    });   
 
     const parsedProducts = products?.map(product => ({
       ...product.toJSON(),
@@ -222,13 +238,10 @@ exports.updateProduct = async (req, res) => {
       return res.status(400).json({ error: "Product already exists" });
     }   
 
-    if (units) {
-      const newProductStock = units;
-      updatedData.units = newProductStock;
-      updatedData.productStock = newProductStock;
-      updatedData.productName = productName;
-    }
-
+    updatedData.units = units;
+    updatedData.productStock = units;
+    updatedData.productName = productName;
+    updatedData.storeQty = storeQty
     await product.update(updatedData);
 
     if (marginPercentage) {
@@ -465,6 +478,7 @@ exports.getAllDrugs = async (req, res) => {
     const { count, rows: drugs } = await Drug.findAndCountAll({
       where: whereConditions,
       order: [["drugName", "ASC"]],
+      distinct: true,
       limit,
       offset,
     });
