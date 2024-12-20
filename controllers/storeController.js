@@ -660,18 +660,25 @@ exports.getProductsOfStore = async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
   const offset = (page - 1) * limit;
+  const searchQuery = req.query.search || "";
+
 
   try {
     const id = req.userId;
-
     const { rows: products, count } = await StoreProduct.findAndCountAll({
       where: { SID: id },
       attributes: ["storeStock", "units"],
-      include: [Product],
+      include: [
+        {
+          model: Product,
+          where: { productName: { [Op.iLike]: `%${searchQuery}%` } },
+        },
+      ],
       order: [[Product, "productName", "ASC"]],
+      distinct: true,
       limit,
       offset,
-    });
+    }); 
 
     const parsedData = products?.map(product => {
       const productData = product?.product.toJSON();
