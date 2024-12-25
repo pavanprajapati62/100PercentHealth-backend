@@ -351,7 +351,7 @@ exports.searchCustomerData = async (req, res) => {
       });
       res.status(200).json(phoneResult || []);
     } else {
-      if (searchQuery.startsWith("P")) {
+      if (/^p/i.test(searchQuery)) {
         const patientResult = await PatientDetails.findAndCountAll({
           where: {
             PID: {
@@ -366,7 +366,7 @@ exports.searchCustomerData = async (req, res) => {
         });
         result = patientResult.rows;
         count = patientResult.count;
-      } else if (searchQuery.startsWith("S")) {
+      } else if (/^s/i.test(searchQuery)) {
         const storeResult = await Order.findAndCountAll({
           where: {
             [Op.or]: [
@@ -399,6 +399,17 @@ exports.searchCustomerData = async (req, res) => {
           offset,
           order: [[PatientDetails, 'name', 'ASC']],
         });
+        const flattenedResult = storeResult.rows.map(order => {
+          const { patientDetail, ...orderData } = order.dataValues;
+          return {
+            ...orderData,
+            patientDetail,
+            name: patientDetail ? patientDetail.name : null,
+            surname: patientDetail ? patientDetail.surname : null,
+          };
+        });
+        
+        storeResult.rows = flattenedResult;
         result = storeResult.rows;
         count = storeResult.count.length;
       } else {
