@@ -141,15 +141,15 @@ exports.getAllProducts = async (req, res) => {
     const offset = (page - 1) * limit;
     const whereConditions = {
       isProductDeleted: false,
-        [Op.or]: [
-          { productName: { [Op.iLike]: `%${searchQuery}%` } },
-        ]
+      [Op.or]: [
+        { productName: { [Op.iLike]: `%${searchQuery}%` } },
+      ]
     };
-    
+
     if (productId) {
-      whereConditions.IID = productId; 
+      whereConditions.IID = productId;
     }
-    
+
     // if (storeId) {
     //   whereConditions.storeQty = {
     //     [Sequelize.Op.contains]: [{ storeId: storeId }],
@@ -178,11 +178,12 @@ exports.getAllProducts = async (req, res) => {
       distinct: true,
       limit,
       offset,
-    });   
+    });
 
     const parsedProducts = products?.map(product => ({
       ...product.toJSON(),
-      drugs: product?.drugs?.map(drug => {0.
+      drugs: product?.drugs?.map(drug => {
+        0.
         try {
           return JSON.parse(drug);
         } catch {
@@ -219,24 +220,39 @@ exports.getProductById = async (req, res) => {
   }
 };
 
+const unmatchedStoreIds = async (storeQty, storeProduct) => {
+  const unmatchedSIDs = storeProduct
+    .filter(
+      product => !storeQty.some(qtyEntry => qtyEntry.storeId === product.dataValues.SID)
+    )
+    .map(product => product.dataValues.SID);
+  return unmatchedSIDs
+}
+
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
   const { marginPercentage, units, storeQty, productName, ...updatedData } = req.body;
-
   try {
 
     const [product, existingProduct] = await Promise.all([
-      Product.findOne({ where: { IID: id } }),
-      Product.findOne({ where: { productName: productName, IID: { [Op.ne]: id }  } })
+      Product.findOne({
+        where: { IID: id }, 
+        include: [
+          {
+            model: StoreProduct,
+          },
+        ],
+      }),
+      Product.findOne({ where: { productName: productName, IID: { [Op.ne]: id } } })
     ]);
-    
+
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
-    
+
     if (existingProduct) {
       return res.status(400).json({ error: "Product already exists" });
-    }   
+    }
 
     updatedData.units = units;
     updatedData.productStock = units;
@@ -266,9 +282,7 @@ exports.updateProduct = async (req, res) => {
       totalStoreStockBefore = storeProducts?.reduce((acc, storeProduct) => acc + storeProduct.storeStock, 0);
     }
 
-    if (storeQty) {
-      // const updatedStoreQty = [...product?.storeQty];
-      // console.log("updatedStoreQty=====", updatedStoreQty)
+    if (storeQty && storeQty.length > 0) {
       for (const { storeId, Qty } of storeQty) {
         const [storeProduct, created] = await StoreProduct.findOrCreate({
           where: { IID: id, SID: storeId },
@@ -279,45 +293,47 @@ exports.updateProduct = async (req, res) => {
             units: product.uom
           },
         });
-        // console.log("storeProduct======", storeProduct)
 
         if (!created) {
-          // If it already exists, update the stock quantity
           await storeProduct.update({ storeStock: Qty });
         }
-
-        // const existingStoreIndex = updatedStoreQty?.findIndex(item => { 
-        //   return item.storeId === storeId;
-        // });
-        // if (existingStoreIndex >= 0) {
-        //   updatedStoreQty[existingStoreIndex].Qty = Qty; 
-        // } else {
-        //   updatedStoreQty.push({ storeId, Qty }); 
-        // }
       }
       let totalStoreStockAfter = 0;
       const storeProductsAfter = await StoreProduct.findAll({
         where: { IID: id },
       });
-  
+
       if (storeProductsAfter.length > 0) {
         totalStoreStockAfter = storeProductsAfter.reduce(
           (acc, storeProduct) => acc + storeProduct.storeStock,
           0
         );
       }
-      console.log("totalStoreStockAfter====", totalStoreStockAfter);
       const stockDifference = totalStoreStockAfter - totalStoreStockBefore;
       if (stockDifference > 0) {
-        // If total store stock after update is greater, subtract from productStock
         await product.update({
           productStock: product.productStock - stockDifference,
         });
       }
-      // console.log("updatedStoreQty=======================", updatedStoreQty)
-      // product.storeQty = updatedStoreQty;
-      // product.changed('storeQty', true);
-      // await product.save();
+
+      if (storeQty && storeQty.length > 0 && product.storeProducts && product.storeProducts.length > 0) {
+        const storeIds = await unmatchedStoreIds(storeQty, product.storeProducts)
+        await StoreProduct.destroy({
+          where: {
+            SID: {
+              [Op.in]: storeIds, // Matches any SID in the array
+            },
+          },
+        });
+      }
+
+    } else {
+      await StoreProduct.destroy({
+        where: {
+          IID: id,
+        },
+        force: true,
+      });
     }
 
     return res.status(200).json({ message: "Product updated successfully", product });
@@ -340,15 +356,15 @@ exports.deleteProduct = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    if(product.productStock !== 0 && totalStoreStock !== 0) {
+    if (totalStoreStock && product?.productStock && product?.productStock !== 0 && totalStoreStock !== 0) {
       return res.status(400).json({ message: "Cannot delete. Product and store stock is available." });
     }
 
-    if(product.productStock !== 0) {
+    if (product?.productStock && product?.productStock !== 0) {
       return res.status(400).json({ message: "Cannot delete. Product stock is available." });
     }
 
-    if(totalStoreStock !== 0) {
+    if (totalStoreStock && totalStoreStock !== 0) {
       return res.status(400).json({ message: "Cannot delete. Store stock is available." });
     }
 
@@ -374,7 +390,7 @@ exports.deleteProduct = async (req, res) => {
     await product.update({
       isProductDeleted: true,
     });
-    
+
     res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -447,8 +463,8 @@ exports.createDrug = async (req, res) => {
 
 exports.updateDrug = async (req, res) => {
   try {
-    const { id } = req.params; 
-    const { drugName } = req.body; 
+    const { id } = req.params;
+    const { drugName } = req.body;
     const drug = await Drug.findByPk(id);
     if (!drug) {
       return res.status(404).json({ message: "Drug not found" });
@@ -470,11 +486,11 @@ exports.getAllDrugs = async (req, res) => {
 
     const offset = (page - 1) * limit;
     const whereConditions = {
-        [Op.or]: [
-          { drugName: { [Op.iLike]: `%${searchQuery}%` } },
-        ]
+      [Op.or]: [
+        { drugName: { [Op.iLike]: `%${searchQuery}%` } },
+      ]
     };
-    
+
     const { count, rows: drugs } = await Drug.findAndCountAll({
       where: whereConditions,
       order: [["drugName", "ASC"]],

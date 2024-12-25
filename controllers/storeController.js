@@ -924,6 +924,7 @@ exports.getOrders = async (req, res) => {
 exports.getOrdersWithoutCancel = async (req, res) => {
   try {
     const SID = req.userId;
+    const searchQuery = req.query.search || "";
 
     let whereConditions = {
       SID,
@@ -931,6 +932,7 @@ exports.getOrdersWithoutCancel = async (req, res) => {
       balanceDosageTime: {
         [Op.gt]: new Date(), // Only include orders with balanceDosageTime in the future
       },
+      OID: { [Op.iLike]: `%${searchQuery}%` }
     };
 
     const page = parseInt(req.query.page) || 1;
