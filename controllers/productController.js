@@ -4,6 +4,7 @@ const Drug = require("../models/Product/Drug");
 const StoreProduct = require("../models/Product/StoreProduct");
 const Store = require("../models/Store/Store");
 const ProductMargin = require("../models/Product/ProductMargin");
+const FrequentProducts = require("../models/Doctor/FrequentProducts");
 const { sequelize } = require("../config/db");
 const OrderProduct = require("../models/Order/Product");
 const Order = require("../models/Order/Order");
@@ -236,7 +237,7 @@ exports.updateProduct = async (req, res) => {
 
     const [product, existingProduct] = await Promise.all([
       Product.findOne({
-        where: { IID: id }, 
+        where: { IID: id },
         include: [
           {
             model: StoreProduct,
@@ -318,22 +319,13 @@ exports.updateProduct = async (req, res) => {
 
       if (storeQty && storeQty.length > 0 && product.storeProducts && product.storeProducts.length > 0) {
         const storeIds = await unmatchedStoreIds(storeQty, product.storeProducts)
-        await StoreProduct.destroy({
-          where: {
-            SID: {
-              [Op.in]: storeIds, // Matches any SID in the array
-            },
-          },
-        });
+        const whereCondition = { SID: { [Op.in]: storeIds }, IID: id }
+        await StoreProduct.destroy({ where: whereCondition });
+        await FrequentProducts.destroy({ where: whereCondition });
       }
-
     } else {
-      await StoreProduct.destroy({
-        where: {
-          IID: id,
-        },
-        force: true,
-      });
+      await StoreProduct.destroy({ where: { IID: id }, force: true });
+      await FrequentProducts.destroy({ where: { IID: id }, force: true });
     }
 
     return res.status(200).json({ message: "Product updated successfully", product });
@@ -380,18 +372,22 @@ exports.deleteProduct = async (req, res) => {
       return orderProduct.order && !orderProduct.order.isAccepted;
     });
 
-    if (pendingOrders.length > 0) {
-      return res.status(400).json({
-        message: "Cannot delete product. Some orders are not yet accepted.",
-        pendingOrders: pendingOrders.map((order) => order.order.OID),
-      });
-    }
+    // if (pendingOrders.length > 0) {
+    //   return res.status(400).json({
+    //     message: "Cannot delete product. Some orders are not yet accepted.",
+    //     pendingOrders: pendingOrders.map((order) => order.order.OID),
+    //   });
+    // }
 
     await product.update({
       isProductDeleted: true,
     });
 
-    res.status(200).json({ message: "Product deleted successfully" });
+    await StoreProduct.destroy({ where: { IID: id }, force: true });
+    await FrequentProducts.destroy({ where: { IID: id }, force: true });
+
+
+    return res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

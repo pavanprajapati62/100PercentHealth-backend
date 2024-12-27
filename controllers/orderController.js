@@ -534,44 +534,36 @@ exports.updateOrderStatus = async (req, res) => {
         });
         const storeProductData = storeProduct?.get({ plain: true });
 
-        if (storeProductData?.storeStock < orderQty) {
+        if (storeProductData && storeProductData?.storeStock < orderQty) {
           return res.status(404).json({
             message: `Insufficient stock for ${productName} to fulfill the required quantity. Please contact to administration.`
           });
         }
       }
 
-      try {
         await sequelize.transaction(async (t) => {
           for (let i = 0; i < orderData?.orderProducts.length; i++) {
-            const { IID, SID, orderQty } = orderData?.orderProducts[i];
+            const { IID, SID, orderQty, productName } = orderData?.orderProducts[i];
+      
             const storeProduct = await StoreProduct.findOne({
               where: { IID: IID, SID: SID },
               transaction: t,
             });
+      
             if (!storeProduct) {
-              return res
-                .status(404)
-                .json({ message: "Store Product not found" });
+              throw new Error(`${productName} product removed by admin.`);
             }
+      
             const newStock = storeProduct.storeStock - orderQty;
-
-            await storeProduct.update(
-              { storeStock: newStock },
-              { transaction: t }
-            );
+            await storeProduct.update({ storeStock: newStock }, { transaction: t });
           }
         });
-      } catch (error) {
-        return res.status(500).json({ message: error });
-      }
 
       order.isAccepted = true;
       order.orderStatus = "Accepted";
       order.acceptTime = new Date();
-      console.log("order.acceptTime===", order.acceptTime)
 
-      var doctorMargin = await getDoctorMargin(
+      await getDoctorMargin(
         orderData.OID,
         orderData.DID,
         orderData?.orderProducts
@@ -581,7 +573,6 @@ exports.updateOrderStatus = async (req, res) => {
       order.isPacked = true;
       order.orderStatus = "Packed";
       order.packedTime = new Date();
-      console.log("order.packedTime===", order.packedTime)
 
       if(order?.isCollect === true) {
         const duration = moment.duration(
@@ -602,6 +593,7 @@ exports.updateOrderStatus = async (req, res) => {
         });
       }
     }
+
     if(isCollected) {
       order.isCollected = true;
       order.orderStatus = "Collected";
@@ -624,12 +616,11 @@ exports.updateOrderStatus = async (req, res) => {
         await invoiceData.update(invoice)
       }
     }
+
     if (isDispatched) {
       order.isDispatched = true;
       order.orderStatus = "Dispatched";
       order.dispatchTime = new Date();
-      console.log("order.dispatchTime===", order.dispatchTime)
-
       if(order?.isClinic === true || order?.isAddress === true) {
         const duration = moment.duration(
           moment(order.dispatchTime).diff(moment(order.acceptTime))
@@ -653,6 +644,7 @@ exports.updateOrderStatus = async (req, res) => {
         await invoiceData.update(invoice)
       }
     }
+
     if (isDelivered) {
       order.isDelivered = true;
       order.orderStatus = "Delivered";
@@ -737,7 +729,10 @@ exports.updateOrderStatus = async (req, res) => {
 
     return res.status(200).json(responseData);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    if (error.message.includes("product removed by admin.")) {
+      return res.status(400).json({ message: error?.message });
+    }
+    return res.status(500).json({ message: error?.message });
   }
 };
 
