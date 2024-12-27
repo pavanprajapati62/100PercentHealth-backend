@@ -555,7 +555,9 @@ async function getOrdersOfDoctor(req, res) {
         createdAt: {
           [Op.between]: [startDate, endDate],
         },
-        orderStatus: "Delivered"
+        orderStatus: {
+          [Op.or]: ["Delivered", "Collected"],
+        }
       },
       include: [{ model: DoctorOrderMargins, attributes: ["marginPercentage"] }]
     });
