@@ -11,6 +11,14 @@ const DoctorPublishRecord = sequelize.define("doctorPublishRecord", {
     },
     allowNull: false,
   },
+  FID: {
+    type: DataTypes.STRING,
+    references: {
+      model: "doctorRents",
+      key: "FID",
+    },
+    allowNull: true,
+  },
   category: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -40,7 +48,7 @@ const DoctorPublishRecord = sequelize.define("doctorPublishRecord", {
     allowNull: false,
   },
   paidRent: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.FLOAT,
     allowNull: false,
   },
   trxId: {

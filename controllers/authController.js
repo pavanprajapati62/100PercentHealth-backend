@@ -6,6 +6,7 @@ const Store = require("../models/Store/Store");
 const Admin = require("../models/Admin");
 const Order = require("../models/Order/Order");
 const PatientDetails = require("../models/Order/PatientDetails");
+const OrderProduct = require("../models/Order/Product");
 const { Op, fn, col } = require("sequelize");
 const PersonalInfo = require("../models/Doctor/PersonalInfo");
 const PatientAddress = require("../models/Order/Adress");
@@ -265,7 +266,8 @@ exports.searchOrderData = async (req, res) => {
           { model: Doctor, include: [{ model: PersonalInfo }] },
           { model: PatientDetails },
           { model: DoctorOrderMargins },
-          { model: Invoice }
+          { model: Invoice },
+          { model: OrderProduct }
         ],
         order: [["createdAt", "DESC"]],
         distinct: true,
@@ -285,7 +287,8 @@ exports.searchOrderData = async (req, res) => {
           { model: Doctor, include: [{ model: PersonalInfo }] },
           { model: PatientDetails },
           { model: DoctorOrderMargins },
-          { model: Invoice }
+          { model: Invoice },
+          { model: OrderProduct }
         ],
         order: [["createdAt", "DESC"]],
         distinct: true,
@@ -305,7 +308,8 @@ exports.searchOrderData = async (req, res) => {
           { model: Doctor, include: [{ model: PersonalInfo }] },
           { model: PatientDetails },
           { model: DoctorOrderMargins },
-          { model: Invoice }
+          { model: Invoice },
+          { model: OrderProduct }
         ],
         order: [["createdAt", "DESC"]],
         distinct: true,
@@ -483,10 +487,29 @@ exports.getAllPatients = async (req, res) => {
 
 exports.publishRecord = async (req, res) => {
   try {
-    const { DID, period } = req.body;
-    // const [month, year] = period.split(" ");
+    const { id } = req.body;
+    const findRecord = await DoctorPublishRecord.findByPk(id) 
 
-    const data = await DoctorPublishRecord.create(req.body);
+    console.log("findRecord", findRecord)
+    if(findRecord) {
+      delete req?.body?.id
+      const [updated] = await DoctorPublishRecord.update(req.body, {
+        where: { id }, 
+        returning: true, 
+      });
+      
+      if (updated) {
+        const updatedRecord = await DoctorPublishRecord.findOne({ where: { id } });
+        return res.status(200).json({ message: "Record updated successfully", data: updatedRecord });
+      } else {
+        return res.status(404).json({ message: "Record not found or update failed" });
+      }
+
+    } else {
+      const data = await DoctorPublishRecord.create(req.body);
+      return res.status(200).json({ message: "Record created successfully", data: data });
+
+    }
 
     // const doctorRent = await DoctorRent.findOne({
     //   where: { DID, month: month, year: year },
@@ -497,7 +520,6 @@ exports.publishRecord = async (req, res) => {
     //   })
     // }
 
-    res.status(200).json({ message: "Record published successfully", data: data });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error?.errors ? error?.errors[0]?.message : error.message });

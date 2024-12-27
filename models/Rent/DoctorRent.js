@@ -4,7 +4,7 @@ const { sequelize } = require("../../config/db");
 const DoctorRent = sequelize.define("doctorRent", {
   FID: {
     type: DataTypes.STRING,
-    allowNull: true,
+    allowNull: false,
     unique: true,
   },
   DID: {
