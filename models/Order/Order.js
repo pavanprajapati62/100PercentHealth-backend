@@ -7,6 +7,7 @@ const PatientAddress = require("./Adress");
 const Invoice = require("./Invoice");
 const DoctorOrderMargins = require("../Doctor/DoctorOrderMargins");
 const PendingDoctorMargin = require("../Rent/PendingDoctorMargin");
+const Contact = require("../Store/Contact");
 
 const Order = sequelize.define("order", {
   OID: {
@@ -229,6 +230,12 @@ Order.hasOne(Billing, {
   onDelete: "CASCADE",
 });
 
+Order.hasOne(Contact, {
+  foreignKey: "SID",
+  sourceKey: "SID",
+  onDelete: "CASCADE",
+});
+
 Order.hasOne(Invoice, {
   foreignKey: "OID",
   sourceKey: "OID",
@@ -243,6 +250,8 @@ Order.hasMany(OrderProduct, {
 OrderProduct.belongsTo(Order, { foreignKey: "OID", targetKey: "OID" });
 
 Billing.belongsTo(Order, { foreignKey: "OID", targetKey: "OID" });
+
+Contact.belongsTo(Order, { foreignKey: "SID", targetKey: "SID" });
 
 Invoice.belongsTo(Order, { foreignKey: "OID", targetKey: "OID" });
 

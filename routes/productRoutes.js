@@ -17,7 +17,7 @@ const { verifyToken, isAdmin, isStoreOrAdmin } = require("../middlewares/roleMid
 
 // Admin routes for managing products stock
 
-router.get("/search-product", searchProduct);
+router.post("/search-product", searchProduct);
 router.get("/search-drug", searchDrug);
 router.post("/create", [verifyToken, isAdmin], createProduct);
 router.get("/all", [verifyToken, isStoreOrAdmin], getAllProducts);
