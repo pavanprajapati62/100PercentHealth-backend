@@ -28,6 +28,7 @@ const DoctorPublishRecord = require("../models/Doctor/DoctorPublishRecord");
 const Invoice = require("../models/Order/Invoice");
 const StoreProduct = require("../models/Product/StoreProduct");
 const { sequelize } = require("../config/db");
+const Contact = require("../models/Store/Contact");
 
 cloudinary.config({
   // cloud_name: "dqok82hhy",
@@ -567,6 +568,7 @@ exports.getAllOrdersOfDoctor = async (req, res) => {
         Billing,
         Invoice,
         OrderProduct,
+        Contact,
         {
           model: Doctor,
           attributes: ["DID", "contactNumber", "role"],

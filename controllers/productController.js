@@ -394,7 +394,7 @@ exports.deleteProduct = async (req, res) => {
 };
 
 exports.searchProduct = async (req, res) => {
-  const searchQuery = req.query.search || "";
+  const searchQuery = req.body.search || "";
 
   try {
     const products = await Product.findAll({
