@@ -678,7 +678,7 @@ exports.getProductsOfStore = async (req, res) => {
       distinct: true,
       limit,
       offset,
-    }); 
+    });
 
     const parsedData = products?.map(product => {
       const productData = product?.product.toJSON();
@@ -796,6 +796,15 @@ exports.getOrders = async (req, res) => {
         return res.status(400).json({ error: "Invalid orderType" });
       }
 
+      if (orderType == '') {
+        whereConditions.orderStatus = {
+          [Op.or]: [
+            { [Op.notIn]: ['Delivered', 'Collected'] },
+            { [Op.is]: null }
+          ]
+        };
+      }
+
       // Apply addressType condition if specified
       if (addressType.length > 0) {
         whereConditions[addressType] = true;
@@ -859,18 +868,60 @@ exports.getOrders = async (req, res) => {
 
     const counts = {};
 
-    const allCount = await Order.count({ where: { SID, [addressType]: true } });
+    const totalCount = await Order.count({
+      where: {
+        SID, orderStatus: {
+          [Op.or]: [
+            { [Op.notIn]: ['Delivered', 'Collected'] },
+            { [Op.is]: null }
+          ]
+        }
+      }
+    });
+
+    const allCount = await Order.count({
+      where: {
+        SID, [addressType]: true, orderStatus: {
+          [Op.or]: [
+            { [Op.notIn]: ['Delivered', 'Collected'] },
+            { [Op.is]: null }
+          ]
+        }
+      }
+    });
 
     const clinicCount = await Order.count({
-      where: { SID, ["isClinic"]: true },
+      where: {
+        SID, ["isClinic"]: true,
+        orderStatus: {
+          [Op.or]: [
+            { [Op.notIn]: ['Delivered'] },
+            { [Op.is]: null }
+          ]
+        }
+      },
     });
 
     const collectCount = await Order.count({
-      where: { SID, ["isCollect"]: true },
+      where: {
+        SID, ["isCollect"]: true, orderStatus: {
+          [Op.or]: [
+            { [Op.notIn]: ['Collected'] },
+            { [Op.is]: null }
+          ]
+        }
+      },
     });
 
     const addressCount = await Order.count({
-      where: { SID, ["isAddress"]: true },
+      where: {
+        SID, ["isAddress"]: true, orderStatus: {
+          [Op.or]: [
+            { [Op.notIn]: ['Delivered'] },
+            { [Op.is]: null }
+          ]
+        }
+      },
     });
 
     const newCount = await Order.count({
@@ -896,7 +947,8 @@ exports.getOrders = async (req, res) => {
     const cancelledCount = await Order.count({
       where: { SID, [addressType]: true, isCancelled: true, orderStatus: "Cancelled" },
     });
-
+     
+    counts['total'] = totalCount;
     counts[`all`] = allCount;
     counts[`isClinic`] = clinicCount;
     counts[`isCollect`] = collectCount;
@@ -924,15 +976,13 @@ exports.getOrders = async (req, res) => {
 exports.getOrdersWithoutCancel = async (req, res) => {
   try {
     const SID = req.userId;
-    const searchQuery = req.query.search || "";
-
+    let searchQuery = req.query.search || "";
     let whereConditions = {
       SID,
       isCancelled: false,
       balanceDosageTime: {
-        [Op.gt]: new Date(), // Only include orders with balanceDosageTime in the future
+        [Op.gt]: new Date(),
       },
-      OID: { [Op.iLike]: `%${searchQuery}%` }
     };
 
     const page = parseInt(req.query.page) || 1;
@@ -945,7 +995,16 @@ exports.getOrdersWithoutCancel = async (req, res) => {
         PatientDetails,
         Billing,
         OrderProduct,
-        Invoice,
+        {
+          model: Invoice,
+          where: {
+            [Op.or]: [
+              { IVID: { [Op.like]: `%${searchQuery}%` } },
+              { OID: { [Op.like]: `%${searchQuery}%` } },
+              { invoiceNo: { [Op.like]: `%${searchQuery}%` } },
+            ],
+          },
+        },
         {
           model: Doctor,
           attributes: ["DID", "contactNumber", "role"],

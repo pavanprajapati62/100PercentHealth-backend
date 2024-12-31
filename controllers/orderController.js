@@ -22,7 +22,7 @@ const fs = require("fs").promises;
 const filterOrdersByDosageAndTimeFrame = async (orders) => {
   try {
     if (!orders?.orderProducts || orders.orderProducts.length === 0) {
-      return 0; 
+      return 0;
     }
 
     // Calculate balanceDosagePercentage for each product
@@ -40,7 +40,7 @@ const filterOrdersByDosageAndTimeFrame = async (orders) => {
     // Return the minimum balanceDosagePercentage
     const minPercentage = Math.min(...percentages);
     console.log("minPercentage====", minPercentage)
-    
+
     return minPercentage.toFixed(2);
   } catch (error) {
     throw new Error(error);
@@ -232,9 +232,9 @@ exports.uploadImage = async (req, res) => {
     return res.status(400).json({
       message: "Failed to upload file.",
     });
-   
+
   } catch (error) {
-   return res.status(500).json({ error: error });
+    return res.status(500).json({ error: error });
   }
 };
 
@@ -541,23 +541,23 @@ exports.updateOrderStatus = async (req, res) => {
         }
       }
 
-        await sequelize.transaction(async (t) => {
-          for (let i = 0; i < orderData?.orderProducts.length; i++) {
-            const { IID, SID, orderQty, productName } = orderData?.orderProducts[i];
-      
-            const storeProduct = await StoreProduct.findOne({
-              where: { IID: IID, SID: SID },
-              transaction: t,
-            });
-      
-            if (!storeProduct) {
-              throw new Error(`${productName} product removed by admin.`);
-            }
-      
-            const newStock = storeProduct.storeStock - orderQty;
-            await storeProduct.update({ storeStock: newStock }, { transaction: t });
+      await sequelize.transaction(async (t) => {
+        for (let i = 0; i < orderData?.orderProducts.length; i++) {
+          const { IID, SID, orderQty, productName } = orderData?.orderProducts[i];
+
+          const storeProduct = await StoreProduct.findOne({
+            where: { IID: IID, SID: SID },
+            transaction: t,
+          });
+
+          if (!storeProduct) {
+            throw new Error(`${productName} product removed by admin.`);
           }
-        });
+
+          const newStock = storeProduct.storeStock - orderQty;
+          await storeProduct.update({ storeStock: newStock }, { transaction: t });
+        }
+      });
 
       order.isAccepted = true;
       order.orderStatus = "Accepted";
@@ -600,7 +600,7 @@ exports.updateOrderStatus = async (req, res) => {
       order.collectedTime = new Date();
 
       let balanceDosageTime;
-      const currentDate = moment(); 
+      const currentDate = moment();
       if (order.balanceDosagePercentage === 100) {
         // Set to 1 week
         balanceDosageTime = currentDate.add(1, 'week').toDate();
@@ -668,7 +668,7 @@ exports.updateOrderStatus = async (req, res) => {
       }
 
       let balanceDosageTime;
-      const currentDate = moment(); 
+      const currentDate = moment();
       if (order.balanceDosagePercentage === 100) {
         // Set to 1 week
         balanceDosageTime = currentDate.add(1, 'week').toDate();
@@ -741,16 +741,38 @@ exports.cancelOrder = async (req, res) => {
   const { cancelReason } = req.body;
 
   try {
-    const order = await Order.findOne({ where: { OID } });
-
+    const order = await Order.findOne({ where: { OID }, include: [OrderProduct] });
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    order.isAccepted = false;
-    order.isPacked = false;
-    order.isDispatched = false;
-    order.isDelivered = false;
+    if (order.orderStatus === "Cancelled") {
+      return res.status(400).json({ message: "Order already canceled" });
+    }
+
+    if (order.orderProducts && order.orderProducts.length > 0) {
+      const caseStatements = order.orderProducts.map(
+        product => `WHEN "IID" = '${product.IID}' AND "SID" = '${product.SID}' THEN "storeStock" + ${product.orderQty}`
+      );
+
+      const ids = order.orderProducts.map(
+        product => `("IID" = '${product.IID}' AND "SID" = '${product.SID}')`
+      );
+
+      const query = `
+        UPDATE "storeProducts"
+        SET "storeStock" = CASE 
+          ${caseStatements.join(' ')}
+        END
+        WHERE ${ids.join(' OR ')}
+      `;
+      await sequelize.query(query);
+    }
+    
+    // order.isAccepted = false;
+    // order.isPacked = false;
+    // order.isDispatched = false;
+    // order.isDelivered = false;
     order.isCancelled = true;
     order.orderStatus = "Cancelled";
     if (cancelReason) {
@@ -786,15 +808,15 @@ exports.getPatientByID = async (req, res) => {
 exports.trackOrder = async (req, res)  => {
   try{
     const OID = req.params.id;
-    const order = await Order.findOne({ 
+    const order = await Order.findOne({
       where: { OID },
-      include: [ 
+      include: [
         { model: PatientDetails },
         { model: Doctor, include: [{ model: PersonalInfo }] },
         { model: OrderProduct },
         { model: Invoice },
         { model: Billing }
-      ] 
+      ]
     });
 
     if (!order) {
