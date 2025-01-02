@@ -514,6 +514,17 @@ exports.deleteDrug = async (req, res) => {
     if (!drug) {
       return res.status(404).json({ message: "Drug not found" });
     }
+
+    await sequelize.query(
+      `UPDATE products
+      SET drugs = array_remove(drugs, :valueToRemove)
+      WHERE :valueToRemove = ANY(drugs);
+      `,
+      {
+        replacements: { valueToRemove: drug.dataValues.drugName },
+        type: sequelize.QueryTypes.UPDATE,
+      }
+    )
     await Drug.destroy({ where: { id } });
     return res.status(200).json({ message: "Drug deleted successfully" });
   } catch (error) {
