@@ -776,6 +776,7 @@ exports.getOrders = async (req, res) => {
       "isPacked",
       "isDispatched",
       "isDelivered",
+      "isCollected",
       "isCancelled",
       "new",
     ];
@@ -787,7 +788,12 @@ exports.getOrders = async (req, res) => {
     let limit = parseInt(req.query.limit) || 10;
 
     if (addressType.length === 0 && orderType.length === 0) {
-      whereConditions = { SID };
+      whereConditions = { SID, orderStatus: {
+        [Op.or]: [
+          { [Op.notIn]: ['Delivered', 'Collected'] },
+          { [Op.is]: null }
+        ]
+      } };
     } else {
       if (addressType.length > 0 && !validAddressTypes.includes(addressType)) {
         return res.status(400).json({ error: "Invalid addressType" });
@@ -814,7 +820,6 @@ exports.getOrders = async (req, res) => {
       if (orderType === "new") {
         whereConditions.orderStatus = null;
       } else {
-        // Map orderType to corresponding orderStatus and ensure other statuses are not set
         if (orderType === "isPacked") {
           whereConditions.orderStatus = "Packed";
         } else if (orderType === "isDispatched") {
@@ -829,9 +834,17 @@ exports.getOrders = async (req, res) => {
           } else {
             whereConditions.orderStatus = "Delivered";
           }
-        } else if (orderType === "isCancelled") {
+        }
+         else if (orderType === "isCancelled") {
           whereConditions.isCancelled = true;
           whereConditions.orderStatus = "Cancelled";
+        }
+        else if (orderType === "isCollected") {
+          if (addressType === "isCollect") {
+            whereConditions.orderStatus = "Collected";
+          } else {
+            whereConditions = { OID: null };
+          }
         }
       }
     }
@@ -895,7 +908,7 @@ exports.getOrders = async (req, res) => {
         SID, ["isClinic"]: true,
         orderStatus: {
           [Op.or]: [
-            { [Op.notIn]: ['Delivered'] },
+            { [Op.notIn]: ['Delivered', 'Collected'] },
             { [Op.is]: null }
           ]
         }
@@ -906,7 +919,7 @@ exports.getOrders = async (req, res) => {
       where: {
         SID, ["isCollect"]: true, orderStatus: {
           [Op.or]: [
-            { [Op.notIn]: ['Collected'] },
+            { [Op.notIn]: ['Collected', 'Delivered'] },
             { [Op.is]: null }
           ]
         }
@@ -917,7 +930,7 @@ exports.getOrders = async (req, res) => {
       where: {
         SID, ["isAddress"]: true, orderStatus: {
           [Op.or]: [
-            { [Op.notIn]: ['Delivered'] },
+            { [Op.notIn]: ['Delivered', 'Collected'] },
             { [Op.is]: null }
           ]
         }
@@ -944,6 +957,10 @@ exports.getOrders = async (req, res) => {
       where: { SID, [addressType]: true, orderStatus: "Delivered" },
     });
 
+    const collectedCount = await Order.count({
+      where: { SID, [addressType]: true, orderStatus: "Collected" },
+    });
+
     const cancelledCount = await Order.count({
       where: { SID, [addressType]: true, isCancelled: true, orderStatus: "Cancelled" },
     });
@@ -958,6 +975,7 @@ exports.getOrders = async (req, res) => {
     counts[`isPacked`] = packedCount;
     counts[`isDispatched`] = dispatchedCount;
     counts[`isDelivered`] = deliveredCount;
+    counts[`isCollected`] = collectedCount
     counts[`isCancelled`] = cancelledCount;
 
     res.status(200).json({
@@ -1014,7 +1032,7 @@ exports.getOrdersWithoutCancel = async (req, res) => {
             },
             {
               model: ClinicAddress,
-              attributes: ["premisesName", "clinicContactNumber"],
+              attributes: ["premisesName", "clinicContactNumber", "city", "state", "pinCode"],
             },
           ],
         },
