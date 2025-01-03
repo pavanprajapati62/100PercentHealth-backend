@@ -379,13 +379,11 @@ exports.deleteProduct = async (req, res) => {
     //   });
     // }
 
-    await product.update({
-      isProductDeleted: true,
-    });
-
-    await StoreProduct.destroy({ where: { IID: id }, force: true });
-    await FrequentProducts.destroy({ where: { IID: id }, force: true });
-
+    await Promise.all([
+      StoreProduct.destroy({ where: { IID: product.IID }, force: true }),
+      FrequentProducts.destroy({ where: { IID: product.IID }, force: true }),
+      product.update({ isProductDeleted: true }, { where: { IID: id } })
+    ]);
 
     return res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
