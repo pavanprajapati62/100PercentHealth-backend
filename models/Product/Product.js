@@ -13,6 +13,7 @@ const Product = sequelize.define("product", {
   productName: {
     type: DataTypes.STRING,
     allowNull: false,
+    collate: 'utf8mb4_unicode_ci',
   },
   manufacturer: {
     type: DataTypes.STRING,
