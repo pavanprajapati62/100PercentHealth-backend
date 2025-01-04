@@ -25,6 +25,7 @@ const Invoice = require("../models/Order/Invoice");
 const { generateLabelHTML } = require("../pdf/labelhtmlTemplate");
 const puppeteer = require("puppeteer");
 const { sequelize } = require("../config/db");
+const { sendDoctorNotification } = require("../config/firebase");
 const cloudinary = require("cloudinary").v2;
 cloudinary.config({
   // cloud_name: "dqok82hhy",
@@ -742,6 +743,10 @@ exports.updateStoreStatus = async (req, res) => {
     const { currentStoreStatus, fcmToken } = req.body;
 
     const store = await Store.findOne({ where: { SID: SID } });
+    const doctors = await Doctor.findAll({
+      where: { SID: store.SID },
+      attributes: ['fcmToken'],
+    });
 
     if (!store) {
       return res.status(404).json({ message: "Store not found" });
@@ -756,6 +761,25 @@ exports.updateStoreStatus = async (req, res) => {
         store.fcmToken = store.fcmToken.filter((token) => token !== fcmToken);
         await store.update({ fcmToken: store.fcmToken });
       }
+    }
+
+    const fcmTokens = [];
+    doctors.forEach((doctor) => {
+      if (doctor.dataValues.fcmToken) {
+        fcmTokens.push(...doctor.dataValues.fcmToken);
+      }
+    });
+
+    const notificationMessage = {
+      title: store.title,
+      body: store.currentStoreStatus,
+      data: {
+        storeName: store.title,
+        status: store.currentStoreStatus,
+      }
+    };
+    if(fcmTokens && fcmTokens.length > 0) {
+    sendDoctorNotification(fcmTokens, notificationMessage);
     }
 
     res.status(200).json({ message: "Store status updated" });

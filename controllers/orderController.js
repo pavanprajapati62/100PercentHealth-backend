@@ -18,6 +18,8 @@ const { cloudinaryUploadImage } = require("../utils/cloudinary");
 const moment = require("moment");
 const { admin, sendNotification } = require("../config/firebase");
 const fs = require("fs").promises;
+const { sendDoctorNotification } = require("../config/firebase");
+const Contact = require("../models/Store/Contact");
 
 const filterOrdersByDosageAndTimeFrame = async (orders) => {
   try {
@@ -517,6 +519,10 @@ exports.updateOrderStatus = async (req, res) => {
       where: { OID },
       include: [{ model: OrderProduct }],
     });
+    const doctor = await Doctor.findOne({
+      where: { DID: order.DID },
+      attributes: ['fcmToken'],
+    });
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -706,6 +712,19 @@ exports.updateOrderStatus = async (req, res) => {
       }
     }
 
+    const notificationMessage = {
+      title: order.OID,
+      body: order.orderStatus,
+      data: {
+        OID: order.OID,
+        DID: order.DID,
+        orderStatus: order.orderStatus,
+      }
+    };
+
+    if(doctor.fcmToken && doctor.fcmToken.length > 0) {
+      sendDoctorNotification(doctor.fcmToken, notificationMessage);
+    }
     await order.save();
 
     // if (invoiceData !== null) {
@@ -742,6 +761,10 @@ exports.cancelOrder = async (req, res) => {
 
   try {
     const order = await Order.findOne({ where: { OID }, include: [OrderProduct] });
+    const doctor = await Doctor.findOne({
+      where: { DID: order.DID },
+      attributes: ['fcmToken'],
+    });
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
@@ -780,6 +803,20 @@ exports.cancelOrder = async (req, res) => {
     }
 
     await order.save();
+    
+    const notificationMessage = {
+      title: order.OID,
+      body: order.orderStatus,
+      data: {
+        OID: order.OID,
+        DID: order.DID,
+        orderStatus: order.orderStatus,
+      }
+    };
+
+    if(doctor.fcmToken && doctor.fcmToken.length > 0) {
+      sendDoctorNotification(doctor.fcmToken, notificationMessage);
+    }
 
     return res.status(200).json({ message: "Order canceled successfully" });
   } catch (error) {
@@ -811,6 +848,7 @@ exports.trackOrder = async (req, res)  => {
     const order = await Order.findOne({
       where: { OID },
       include: [
+        { model: Contact },
         { model: PatientDetails },
         { model: Doctor, include: [{ model: PersonalInfo }] },
         { model: OrderProduct },

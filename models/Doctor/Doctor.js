@@ -56,6 +56,11 @@ const Doctor = sequelize.define("doctor", {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
+  fcmToken: {
+    type: DataTypes.JSONB, 
+    defaultValue: [],
+    allowNull: true,
+  }
 });
 
 // Before creating a doctor, generate a unique DID and hash the pin

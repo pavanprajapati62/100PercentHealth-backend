@@ -14,10 +14,10 @@ const generateProductRows = (products) => {
       <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 250px; color: #513e3e; font-weight: 500;">
         ${product.productName}
       </td>
-      <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 150px; color: #513e3e; font-weight: 500;">
+      <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 200px; color: #513e3e; font-weight: 500;">
         ${product.morningTime}-${product.midDay}-${product.eveningTime}-${product.night}-${product.takenTime}
       </td>
-      <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 150px; color: #513e3e; font-weight: 500;text-align:center;">
+      <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 100px; color: #513e3e; font-weight: 500;text-align:center;">
         ${product?.extra || " "}
       </td>
       <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 100px; color: #513e3e; font-weight: 500;text-align:center;">
@@ -388,7 +388,7 @@ const generateHTML = (data, doctor) => {
                         font-weight: 600;
                         color: #8e1010;
                         border-bottom: 1px solid #8e1010;
-                        width: 150px;
+                        width: 200px;
                       "
                     >
                       A/B
@@ -401,7 +401,7 @@ const generateHTML = (data, doctor) => {
                         font-weight: 600;
                         color: #8e1010;
                         border-bottom: 1px solid #8e1010;
-                        width: 150px;
+                        width: 100px;
                         text-align:center;
                       "
                     >
