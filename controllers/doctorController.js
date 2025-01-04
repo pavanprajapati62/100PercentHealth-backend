@@ -362,7 +362,7 @@ exports.getBillingDetails = async (req, res) => {
 exports.updateDoctorStatus = async (req, res) => {
   try {
     const DID = req.userId;
-    const { currentDoctorStatus } = req.body;
+    const { currentDoctorStatus, fcmToken } = req.body;
 
     const doctor = await Doctor.findOne({ where: { DID: DID } });
 
@@ -373,6 +373,13 @@ exports.updateDoctorStatus = async (req, res) => {
     doctor.currentDoctorStatus = currentDoctorStatus;
 
     await doctor.update({ currentDoctorStatus });
+
+    if (fcmToken) {
+      if (doctor.fcmToken.includes(fcmToken)) {
+        doctor.fcmToken = doctor.fcmToken.filter((token) => token !== fcmToken);
+        await doctor.update({ fcmToken: doctor.fcmToken });
+      }
+    }
 
     res.status(200).json({ message: "Doctor status updated" });
   } catch (err) {

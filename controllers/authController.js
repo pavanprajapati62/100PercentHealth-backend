@@ -15,6 +15,7 @@ const DoctorOrderMargins = require("../models/Doctor/DoctorOrderMargins");
 const Invoice = require("../models/Order/Invoice");
 const { sequelize } = require("../config/db");
 const DoctorRent = require("../models/Rent/DoctorRent");
+const { sendDoctorNotification } = require("../config/firebase");
 
 exports.adminSignUp = async (req, res) => {
   try {
@@ -111,7 +112,7 @@ exports.refreshToken = async (req, res) => {
 }
 
 exports.doctorLogin = async (req, res) => {
-  const { contactNumber, pin } = req.body;
+  const { contactNumber, pin, fcmToken } = req.body;
 
   try {
     if (contactNumber === "" || pin === "") {
@@ -148,6 +149,14 @@ exports.doctorLogin = async (req, res) => {
       return res.status(401).json({ message: "Invalid PIN" });
     }
 
+    if (fcmToken !== null && fcmToken !== undefined) {
+      if (!doctor.fcmToken.includes(fcmToken)) {
+        doctor.fcmToken.push(fcmToken);
+        doctor.changed('fcmToken', true);
+        await doctor.save();
+      }
+    }
+
     doctor.currentDoctorStatus = "ACTIVE";
     await doctor.save();
 
@@ -182,6 +191,11 @@ exports.storeLogin = async (req, res) => {
 
   try {
     const store = await Store.findOne({ where: { username: username.toLowerCase().trim() } });
+    const doctors = await Doctor.findAll({
+      where: { SID: store.SID },
+      attributes: ['fcmToken'],
+    });
+
     if (!store) {
       return res.status(404).json({ message: "Username not found" });
     }
@@ -220,7 +234,25 @@ exports.storeLogin = async (req, res) => {
       process.env.JWT_SECRET
     );
 
-    res.status(200).json({
+    const fcmTokens = [];
+    doctors.forEach((doctor) => {
+      if (doctor.dataValues.fcmToken) {
+        fcmTokens.push(...doctor.dataValues.fcmToken);
+      }
+    });
+
+    const notificationMessage = {
+      title: store.title,
+      body: store.currentStoreStatus,
+      data: {
+        storeName: store.title,
+        status: store.currentStoreStatus,
+      }
+    };
+    if(fcmTokens && fcmTokens.length > 0) {
+      sendDoctorNotification(fcmTokens, notificationMessage);
+    }
+    return res.status(200).json({
       message: "Login successful",
       token,
       refreshToken,
@@ -228,7 +260,7 @@ exports.storeLogin = async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
