@@ -471,7 +471,7 @@ const getMargin = (mrp, categoryPercentage) => {
   return parseFloat(margin.toFixed(2));
 };
 
-const getDoctorMargin = async (orderId, doctorId, orderProducts) => {
+const createDoctorMargin = async (orderId, doctorId, orderProducts) => {
   try {
     const doctor = await Doctor.findOne({
       where: { DID: doctorId },
@@ -568,12 +568,6 @@ exports.updateOrderStatus = async (req, res) => {
       order.isAccepted = true;
       order.orderStatus = "Accepted";
       order.acceptTime = new Date();
-
-      await getDoctorMargin(
-        orderData.OID,
-        orderData.DID,
-        orderData?.orderProducts
-      );
     }
     if (isPacked) {
       order.isPacked = true;
@@ -621,6 +615,12 @@ exports.updateOrderStatus = async (req, res) => {
         })
         await invoiceData.update(invoice)
       }
+
+      await createDoctorMargin(
+        orderData.OID,
+        orderData.DID,
+        orderData?.orderProducts
+      );
     }
 
     if (isDispatched) {
@@ -710,6 +710,12 @@ exports.updateOrderStatus = async (req, res) => {
         })
         await invoiceData.update(invoice)
       }
+
+      await createDoctorMargin(
+        orderData.OID,
+        orderData.DID,
+        orderData?.orderProducts
+      );
     }
 
     const notificationMessage = {
