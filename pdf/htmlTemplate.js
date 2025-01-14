@@ -2,6 +2,19 @@ const fs = require('fs');
 const path = require('path');
 const moment = require('moment');
 
+const getDosageDescription = (takenTime) => {
+  switch (takenTime) {
+    case "A/F":
+      return "After Food";
+    case "B/F":
+      return "Before Food";
+    case "X":
+      return ""; 
+    default:
+      return takenTime;
+  }
+};
+
 const generateProductRows = (products) => {
   return products.map((product, index) => `
     <tr>
@@ -15,7 +28,7 @@ const generateProductRows = (products) => {
         ${product.productName}
       </td>
       <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 200px; color: #513e3e; font-weight: 500;">
-        ${product.morningTime}-${product.midDay}-${product.eveningTime}-${product.night}-${product.takenTime}
+        ${product.morningTime}-${product.midDay}-${product.eveningTime}-${product.night}-${ getDosageDescription(product.takenTime)}
       </td>
       <td style="font-size: 14px; text-align: left; padding: 8px 12px; width: 100px; color: #513e3e; font-weight: 500;text-align:center;">
         ${product?.extra || " "}

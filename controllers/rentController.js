@@ -19,14 +19,14 @@ const fs = require("fs");
 async function generateMonthlyRent() {
   try {
     const currentMonth = moment().month();
-    const currentYear = moment().year();
+    let currentYear = moment().year();
     const previousMonthName = moment().subtract(1, "month").format("MMMM");
     // 1. Get start and end dates for the previous month
-    const startOfPreviousMonth = moment()
+    const startOfPreviousMonth = moment.utc()
       .subtract(1, "month")
       .startOf("month")
       .toDate();
-    const endOfPreviousMonth = moment()
+    const endOfPreviousMonth = moment.utc()
       .subtract(1, "month")
       .endOf("month")
       .toDate();
@@ -43,6 +43,9 @@ async function generateMonthlyRent() {
           model: Order,
           as: "order",
           where: {
+            orderStatus: {
+              [Op.or]: ["Delivered", "Collected"],
+            },
             [Op.or]: [
               {
                 isDelivered: true,
@@ -54,24 +57,21 @@ async function generateMonthlyRent() {
               },
             ],
           },
-          attributes: [], 
-        },
+          attributes: [],
+        }
       ],
-      attributes: [
-        "DID", 
-        [
-          Sequelize.fn("COUNT", Sequelize.col("doctorOrderMargin.OID")),
-          "totalOrders",
-        ], 
-        [
-          Sequelize.fn(
-            "SUM",
-            Sequelize.col("doctorOrderMargin.marginPercentage")
-          ),
-          "totalMarginPercentage",
+        attributes: [
+          "DID",
+          [
+            Sequelize.fn("COUNT", Sequelize.fn("DISTINCT", Sequelize.col("doctorOrderMargin.OID"))),
+            "totalOrders",
+          ],
+          [
+            Sequelize.fn("SUM", Sequelize.col("doctorOrderMargin.marginPercentage")),
+            "totalMarginPercentage",
+          ],
         ],
-      ],
-      group: ["doctorOrderMargin.DID"], 
+        group: ["doctorOrderMargin.DID"],
     });
 
     // 3. Fetch previously undelivered orders that are now delivered from PendingDoctorMargins
@@ -114,6 +114,9 @@ async function generateMonthlyRent() {
       await PendingDoctorMargin.destroy({ where: { DID, OID } });
     }
 
+    if (previousMonthName === "December"){
+      currentYear = currentYear - 1;
+    }
     // 5. Create DoctorRent entries based on combined data
     const rentRecords = Object.entries(rentData).map(([DID, data]) => ({
       DID,
@@ -179,7 +182,7 @@ async function testGenerateMonthlyRent(req, res) {
   try {
     const { month, start, end } = req.body;
     const currentMonth = moment().month();
-    const currentYear = moment().year();
+    let currentYear = moment().year();
 
     const previousMonthName = month;
     const startOfPreviousMonth = start;
@@ -192,6 +195,9 @@ async function testGenerateMonthlyRent(req, res) {
           model: Order,
           as: "order",
           where: {
+            orderStatus: {
+              [Op.or]: ["Delivered", "Collected"],
+            },
             [Op.or]: [
               {
                 isDelivered: true,
@@ -203,24 +209,21 @@ async function testGenerateMonthlyRent(req, res) {
               },
             ],
           },
-          attributes: [], 
-        },
+          attributes: [],
+        }
       ],
-      attributes: [
-        "DID", 
-        [
-          Sequelize.fn("COUNT", Sequelize.col("doctorOrderMargin.OID")),
-          "totalOrders",
-        ], 
-        [
-          Sequelize.fn(
-            "SUM",
-            Sequelize.col("doctorOrderMargin.marginPercentage")
-          ),
-          "totalMarginPercentage",
+        attributes: [
+          "DID",
+          [
+            Sequelize.fn("COUNT", Sequelize.fn("DISTINCT", Sequelize.col("doctorOrderMargin.OID"))),
+            "totalOrders",
+          ],
+          [
+            Sequelize.fn("SUM", Sequelize.col("doctorOrderMargin.marginPercentage")),
+            "totalMarginPercentage",
+          ],
         ],
-      ],
-      group: ["doctorOrderMargin.DID"], 
+        group: ["doctorOrderMargin.DID"],
     });
 
     // 3. Fetch previously undelivered orders that are now delivered from PendingDoctorMargins
@@ -263,6 +266,9 @@ async function testGenerateMonthlyRent(req, res) {
       await PendingDoctorMargin.destroy({ where: { DID, OID } });
     }
 
+    if (previousMonthName === "December"){
+      currentYear = currentYear - 1;
+    }
     // 5. Create DoctorRent entries based on combined data
     const rentRecords = Object.entries(rentData).map(([DID, data]) => ({
       DID,
@@ -370,7 +376,6 @@ async function getRentOfDoctor(req, res) {
         },
       ],
     });
-
     if (!doctorRent) {
       return res.status(404).json({ error: "No Record Found" });
     }
@@ -476,6 +481,25 @@ async function getRentOfDoctor(req, res) {
   }
 }
 
+const getStartAndEndOfMonth = (month, year) => {
+  const startDate = moment
+    .utc()
+    .year(year)
+    .month(month - 1)
+    .startOf("month")
+    .toDate();
+
+  const endDate = moment
+    .utc()
+    .year(year)
+    .month(month - 1)
+    .endOf("month")
+    .toDate();
+
+  return { startDate, endDate };
+};
+
+
 async function getOrdersOfDoctor(req, res) {
   try {
     const monthMapping = {
@@ -501,10 +525,11 @@ async function getOrdersOfDoctor(req, res) {
       return res.status(400).json({ error: "Invalid month provided" });
     }
 
-    const startDate = new Date(Date.UTC(year, monthNumber  - 1, 1, 0, 0, 0)).toISOString();
+    const { startDate, endDate } = getStartAndEndOfMonth(monthNumber, year);
 
-    // Last day of the month at 23:59:59 (Local Time)
-    const endDate = new Date(year, monthNumber, 0, 23, 59, 59, 999);
+
+    // const startDate = new Date(Date.UTC(year, monthNumber  - 1, 1, 0, 0, 0)).toISOString();
+    // const endDate = new Date(Date.UTC(year, monthNumber, 0, 23, 59, 59, 999)).toISOString();
 
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -513,9 +538,16 @@ async function getOrdersOfDoctor(req, res) {
     const orders = await Order.findAndCountAll({
       where: {
         DID: DID,
-        createdAt: {
-          [Op.between]: [startDate, endDate],
-        },
+        [Op.or]: [
+          {
+            isDelivered: true,
+            deliveredTime: { [Op.between]: [startDate, endDate] },
+          },
+          {
+            isCollected: true,
+            collectedTime: { [Op.between]: [startDate, endDate] },
+          },
+        ],
         orderStatus: {
           [Op.or]: ["Delivered", "Collected"],
         }
@@ -552,14 +584,23 @@ async function getOrdersOfDoctor(req, res) {
     const marginOrders = await Order.findAll({
       where: {
         DID: DID,
-        createdAt: {
-          [Op.between]: [startDate, endDate],
-        },
+        [Op.or]: [
+          {
+            isDelivered: true,
+            deliveredTime: { [Op.between]: [startDate, endDate] },
+          },
+          {
+            isCollected: true,
+            collectedTime: { [Op.between]: [startDate, endDate] },
+          },
+        ],
         orderStatus: {
           [Op.or]: ["Delivered", "Collected"],
         }
       },
-      include: [{ model: DoctorOrderMargins, attributes: ["marginPercentage"] }]
+      include: [ 
+        { model: OrderProduct},
+        { model: DoctorOrderMargins, attributes: ["marginPercentage"] }]
     });
 
     const totalMarginPercentage = marginOrders?.filter(order => order.doctorOrderMargin !== null).reduce((sum, order) => sum + order.doctorOrderMargin.marginPercentage, 0);
