@@ -481,7 +481,7 @@ const createDoctorMargin = async (orderId, doctorId, orderProducts) => {
 
     let totalMarginPercentage = 0;
     for (let i = 0; i < orderProducts.length; i++) {
-      const { IID, mrp } = orderProducts[i];
+      const { IID, mrp, orderQty } = orderProducts[i];
       const product = await Product.findOne({
         where: { IID: IID },
         include: [{ model: ProductMargin }],
@@ -493,7 +493,7 @@ const createDoctorMargin = async (orderId, doctorId, orderProducts) => {
 
       if (categoryPercentage !== undefined) {
         const margin = getMargin(mrp, categoryPercentage);
-        totalMarginPercentage += margin;
+        totalMarginPercentage += margin*orderQty;
       }
     }
 
@@ -779,7 +779,7 @@ exports.cancelOrder = async (req, res) => {
       return res.status(400).json({ message: "Order already canceled" });
     }
 
-    if (order.orderProducts && order.orderProducts.length > 0) {
+    if (order.orderProducts && order.orderProducts.length > 0 && order.orderStatus) {
       const caseStatements = order.orderProducts.map(
         product => `WHEN "IID" = '${product.IID}' AND "SID" = '${product.SID}' THEN "storeStock" + ${product.orderQty}`
       );

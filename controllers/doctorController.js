@@ -631,7 +631,7 @@ exports.createPdf = async (req, res) => {
       printBackground: true,
     });
     cloudinary.uploader
-      .upload_stream({ resource_type: 'raw' }, async (error, result) => {
+      .upload_stream({ resource_type: 'image' }, async (error, result) => {
         if (error) {
           console.error(error);
           res
