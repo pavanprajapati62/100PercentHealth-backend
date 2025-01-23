@@ -797,6 +797,7 @@ exports.getOrders = async (req, res) => {
 
     const validAddressTypes = ["isClinic", "isCollect", "isAddress"];
     const validOrderTypes = [
+      "isAccepted",
       "isPacked",
       "isDispatched",
       "isDelivered",
@@ -844,7 +845,10 @@ exports.getOrders = async (req, res) => {
       if (orderType === "new") {
         whereConditions.orderStatus = null;
       } else {
-        if (orderType === "isPacked") {
+        if (orderType === "isAccepted") {
+          whereConditions.orderStatus = "Accepted";
+        }
+        else if (orderType === "isPacked") {
           whereConditions.orderStatus = "Packed";
         } else if (orderType === "isDispatched") {
           if (addressType === "isCollect") {
