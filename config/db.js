@@ -1,6 +1,5 @@
+require("dotenv").config();
 const { Sequelize } = require("sequelize");
-const fs = require('fs');
-
 
 const sequelize = new Sequelize(
   process.env.DB_NAME,
@@ -8,31 +7,47 @@ const sequelize = new Sequelize(
   process.env.DB_PASS,
   {
     host: process.env.DB_HOST,
-    port: process.env.DB_PORT || 24920,
+    port: process.env.DB_PORT,
     dialect: "postgres",
     logging: false,
     dialectOptions: {
-      connectTimeout: 10000,
       ssl: {
         require: true,
-        ca: fs.readFileSync('../health_hub-ca-certificate.crt')      },
+        rejectUnauthorized: false,
+      },
     },
   }
 );
 
-// Test the connection
-sequelize
-  .authenticate()
-  .then(() => {
-    console.log("Database connection established.");
-    return sequelize.sync({ force: true });
-  })
-  .then(() => {
-    console.log("Server is running on port 5000.");
-  })
-  .catch((err) => {
-    console.error("Unable to connect to the database:", err);
-  });
+// Function to sync DB: first drop, then update only keys
+const syncDatabase = async () => {
+  try {
+    const isFirstRun = process.argv.includes("--reset-db"); // Add a CLI flag for first-time reset
+
+    if (isFirstRun) {
+      console.log("⚠️ Dropping and recreating all tables...");
+      await sequelize.sync({ force: true });
+    } else {
+      console.log("🔄 Syncing database (updating keys)...");
+      await sequelize.sync({ alter: true });
+    }
+
+    console.log("✅ Database sync completed.");
+  } catch (error) {
+    console.error("❌ Error syncing database:", error);
+  }
+};
+
+// Connect and sync
+(async () => {
+  try {
+    await sequelize.authenticate();
+    console.log("✅ Database connection established.");
+    await syncDatabase();
+  } catch (error) {
+    console.error("❌ Unable to connect to the database:", error);
+  }
+})();
 
 const db = {};
 db.Sequelize = Sequelize;
