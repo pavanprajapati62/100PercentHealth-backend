@@ -11,10 +11,10 @@ const sequelize = new Sequelize(
     logging: false,
     dialectOptions: {
       connectTimeout: 10000,
-      // ssl: {
-      //   require: true,
-      //   rejectUnauthorized: false,
-      // },
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+      },
     },
   }
 );
@@ -24,7 +24,7 @@ sequelize
   .authenticate()
   .then(() => {
     console.log("Database connection established.");
-    // return sequelize.sync({ force: true });
+    return sequelize.sync({ force: true });
   })
   .then(() => {
     console.log("Server is running on port 5000.");
