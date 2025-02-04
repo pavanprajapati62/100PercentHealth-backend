@@ -10,10 +10,11 @@ const sequelize = new Sequelize(
     dialect: "postgres",
     logging: false,
     dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false,
-      },
+      connectTimeout: 10000,
+      // ssl: {
+      //   require: true,
+      //   rejectUnauthorized: false,
+      // },
     },
   }
 );
