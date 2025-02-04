@@ -1,4 +1,6 @@
 const { Sequelize } = require("sequelize");
+const fs = require('fs');
+
 
 const sequelize = new Sequelize(
   process.env.DB_NAME,
@@ -13,8 +15,7 @@ const sequelize = new Sequelize(
       connectTimeout: 10000,
       ssl: {
         require: true,
-        rejectUnauthorized: false,
-      },
+        ca: fs.readFileSync('../health_hub-ca-certificate.crt')      },
     },
   }
 );
