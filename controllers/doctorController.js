@@ -17,28 +17,17 @@ const Address = require("../models/Store/Address");
 const jwt = require("jsonwebtoken");
 const Billing = require("../models/Order/Billing");
 const OrderProduct = require("../models/Order/Product");
-const { uploadPdf } = require("../utils/cloudinary");
+const { uploadToS3 } = require("../utils/s3Upload");
 const puppeteer = require("puppeteer");
 // const fs = require("fs");
 const path = require('path');
 const { generateHTML } = require("../pdf/htmlTemplate");
-const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 const DoctorPublishRecord = require("../models/Doctor/DoctorPublishRecord");
 const Invoice = require("../models/Order/Invoice");
 const StoreProduct = require("../models/Product/StoreProduct");
 const { sequelize } = require("../config/db");
 const Contact = require("../models/Store/Contact");
-
-cloudinary.config({
-  // cloud_name: "dqok82hhy",
-  // api_key: "315381883713581",
-  // api_secret: "UAwvaQ1JK8x8e_X6nNhh0H8ujmg",
-
-  cloud_name:"diwtdktzc",
-  api_key:"211218781222369",
-  api_secret:"xbPZxQl7qFKX9nJXuTeMQ6wzXNA",
-});
 
 exports.createDoctor = async (req, res) => {
   const transaction = await sequelize.transaction({ timeout: 60000 });
@@ -566,8 +555,6 @@ exports.getAllOrdersOfDoctor = async (req, res) => {
       whereClause.isAddress = true;
     }
 
-    console.log("whereClause===", whereClause)
-
     const { count, rows: orders } = await Order.findAndCountAll({
       where: whereClause,
       include: [
@@ -622,29 +609,16 @@ exports.createPdf = async (req, res) => {
       args: ['--no-sandbox']
     });
     const page = await browser.newPage();
-
     await page.setContent(htmlContent, { waitUntil: "domcontentloaded" });
-    let pdfCloudinaryPath = null;
+    let pdfPath = null;
 
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
     });
-    cloudinary.uploader
-      .upload_stream({ resource_type: 'image' }, async (error, result) => {
-        if (error) {
-          console.error(error);
-          res
-            .status(500)
-            .json({ message: error.message });
-          return;
-        }
 
-        pdfCloudinaryPath = result.secure_url;
-        res.status(200).json({ success: true, url: pdfCloudinaryPath });
-      })
-      .end(pdfBuffer);
-
+    pdfPath = await uploadToS3(pdfBuffer, "pdf")
+    res.status(200).json({ success: true, url: pdfPath })
     await browser.close();
 
   } catch (error) {

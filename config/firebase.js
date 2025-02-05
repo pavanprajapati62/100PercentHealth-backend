@@ -19,9 +19,6 @@ const sendNotification = async (tokens, message) => {
       console.error("No valid tokens provided.");
       return;
     }
-
-    console.log("tokens===========", tokens)
-    console.log("payload===", payload)
     for (const token of tokens) {
       try {
         const response = await admin.messaging().send({
@@ -29,7 +26,6 @@ const sendNotification = async (tokens, message) => {
           notification: payload.notification,
         });
         console.log("Notification sent to token:", token);
-        console.log("response----", response);
       } catch (error) {
         console.error(`Error sending notification to token: ${token}`, error);
       }

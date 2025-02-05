@@ -522,7 +522,6 @@ exports.publishRecord = async (req, res) => {
     const { id } = req.body;
     const findRecord = await DoctorPublishRecord.findByPk(id) 
 
-    console.log("findRecord", findRecord)
     if(findRecord) {
       delete req?.body?.id
       const [updated] = await DoctorPublishRecord.update(req.body, {
@@ -603,7 +602,6 @@ exports.updatePublishRecord = async (req, res) => {
 
     await publishRecord.update(req.body);
 
-    console.log("DID", DID)
     const doctorRent = await DoctorRent.findOne({
       where: { DID, month: month, year: year },
     })

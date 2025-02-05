@@ -23,18 +23,10 @@ const PatientAddress = require("../models/Order/Adress");
 const DoctorOrderMargins = require("../models/Doctor/DoctorOrderMargins");
 const Invoice = require("../models/Order/Invoice");
 const { generateLabelHTML } = require("../pdf/labelhtmlTemplate");
+const { uploadToS3 } = require("../utils/s3Upload");
 const puppeteer = require("puppeteer");
 const { sequelize } = require("../config/db");
 const { sendDoctorNotification } = require("../config/firebase");
-const cloudinary = require("cloudinary").v2;
-cloudinary.config({
-  // cloud_name: "dqok82hhy",
-  // api_key: "315381883713581",
-  // api_secret: "UAwvaQ1JK8x8e_X6nNhh0H8ujmg",
-  cloud_name: "diwtdktzc",
-  api_key: "211218781222369",
-  api_secret: "xbPZxQl7qFKX9nJXuTeMQ6wzXNA",
-});
 
 exports.createStore = async (req, res) => {
   const transaction = await sequelize.transaction({ timeout: 60000 });
@@ -1167,16 +1159,7 @@ exports.createLabelPdf = async (req, res) => {
       printBackground: true,
     });
 
-    const uploadPromise = new Promise((resolve, reject) => {
-      cloudinary.uploader.upload_stream({ resource_type: 'raw' }, (error, result) => {
-        if (error) {
-          return reject(error);
-        }
-        resolve(result.secure_url);
-      }).end(pdfBuffer);
-    });
-
-    const uploadedUrl = await uploadPromise;
+    const uploadedUrl =  await uploadToS3(pdfBuffer, "pdf");
     urls.push(uploadedUrl);
 
     await page.close();

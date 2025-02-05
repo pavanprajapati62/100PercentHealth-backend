@@ -14,7 +14,7 @@ const Product = require("../models/Product/Product");
 const ProductMargin = require("../models/Product/ProductMargin");
 const StoreProduct = require("../models/Product/StoreProduct");
 const Store = require("../models/Store/Store");
-const { cloudinaryUploadImage } = require("../utils/cloudinary");
+const { s3UploadImage } = require("../utils/s3Upload");
 const moment = require("moment");
 const { admin, sendNotification } = require("../config/firebase");
 const fs = require("fs").promises;
@@ -37,11 +37,9 @@ const filterOrdersByDosageAndTimeFrame = async (orders) => {
 
       return percentage;
     });
-    console.log("percentages============", percentages)
 
     // Return the minimum balanceDosagePercentage
     const minPercentage = Math.min(...percentages);
-    console.log("minPercentage====", minPercentage)
 
     return minPercentage.toFixed(2);
   } catch (error) {
@@ -145,7 +143,6 @@ exports.createOrder = async (req, res) => {
     let patientAddress = await PatientAddress.findOne({
       where: { PID: PID },
     });
-    console.log("patientAddress", patientAddress)
 
     if (patientAddress) {
       // Update existing address
@@ -176,7 +173,6 @@ exports.createOrder = async (req, res) => {
     });
     const data = orderData.get({ plain: true });
     const percentage = await filterOrdersByDosageAndTimeFrame(data);
-    console.log("percentage===", percentage)
     await orderData.update({ balanceDosagePercentage: percentage});
 
     const tokens = store?.fcmToken; // Get the fcmTokens of the store
@@ -219,7 +215,7 @@ exports.uploadImage = async (req, res) => {
 
     var locaFilePath = req?.file?.path;
     if (locaFilePath) {
-      var result = await cloudinaryUploadImage(locaFilePath);
+      var result = await s3UploadImage(locaFilePath);
       await fs.unlink(locaFilePath);
       url = result?.url
     }
@@ -440,7 +436,6 @@ exports.updateOrder = async (req, res) => {
       const data = orderData.get({ plain: true });
 
       const percentage = await filterOrdersByDosageAndTimeFrame(data);
-      console.log("percentage=====", percentage)
     }
 
     res.status(200).json({ message: "Order updated successfully" });
