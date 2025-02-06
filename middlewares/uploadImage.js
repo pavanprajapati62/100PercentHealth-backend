@@ -8,11 +8,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    let fileName = '';
-    if(ext.toLowerCase() === 'pdf') {
-       fileName = `${Date.now()}-pdf${ext}`;
-    } else {
-       fileName = `${Date.now()}-${file.fieldname}${ext}`;    }    
+    const fileName = `${Date.now()}${ext}`; 
     cb(null, fileName);
   },
 });
