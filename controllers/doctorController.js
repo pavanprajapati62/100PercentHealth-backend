@@ -603,6 +603,7 @@ exports.createPdf = async (req, res) => {
       include: [PersonalInfo, ClinicAddress, Compliances]
     });
 
+     data.products = data.products.filter(obj => obj?.productId && obj?.productId?.length > 0)
     const htmlContent = generateHTML(data, doctor);
 
     const browser = await puppeteer.launch({
