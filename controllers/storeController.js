@@ -1108,7 +1108,8 @@ exports.createLabelPdf = async (req, res) => {
     const data = req.body;
     const urls = [];
     const browser = await puppeteer.launch({
-      args: ['--no-sandbox']
+       ignoreDefaultArgs: ['--disable-extensions'],
+       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
     const extraMap = data.product.reduce((map, product) => {

@@ -10,13 +10,13 @@ const sequelize = new Sequelize(
     port: process.env.DB_PORT || 5432,
     dialect: "postgres",
     logging: false,
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false, // Allow self-signed certificates
-      },
-      connectTimeout: 60000, // Increase connection timeout (60s)
-    },
+    // dialectOptions: {
+    //   ssl: {
+    //     require: true,
+    //     rejectUnauthorized: false, // Allow self-signed certificates
+    //   },
+    //   connectTimeout: 60000, // Increase connection timeout (60s)
+    // },
     pool: {
       max: 10, // Allow up to 10 concurrent connections
       min: 2, // Keep at least 2 connections open

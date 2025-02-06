@@ -33,19 +33,45 @@ const uploadToS3 = async (buffer, fileName) => {
   }
 };
 
+function getContentTypeForImage(fileName) {
+  const extension = fileName.split('.').pop().toLowerCase();
+  
+  switch (extension) {
+    case 'jpeg':
+    case 'jpg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    default:
+      return 'application/octet-stream'; 
+  }
+}
 // Upload image to S3
 const s3UploadImage = async (fileToUpload) => {
   try {
     const fileStream = fs.createReadStream(fileToUpload);
 
-    // Set the upload parameters
-    const uploadParams = {
-      Bucket: BUCKET,
-      Key: `Prescription/${Date.now()}_${fileToUpload.split('/').pop()}`, 
-      Body: fileStream,
-      ACL: 'public-read', 
-    };
-
+    const value = fileToUpload.split('/').pop()
+    const valueType = value.split('.').pop()
+let uploadParams= {};
+    if(valueType === 'pdf' || valueType === 'PDF') {
+       uploadParams = {
+        Bucket: BUCKET,
+        Key: `Prescription/${fileToUpload.split('/').pop()}`, 
+        Body: fileStream,
+        ContentType: 'application/pdf',  
+        ACL: 'public-read', 
+      };
+    } else {
+      uploadParams = {
+        Bucket: BUCKET,
+        Key: `Prescription/${fileToUpload.split('/').pop()}`, 
+        Body: fileStream,
+        ContentType: getContentTypeForImage(fileToUpload),  
+        ACL: 'public-read', 
+      };
+    }
+    
     const result = await s3.upload(uploadParams).promise();
     return { url: result.Location };
   } catch (error) {

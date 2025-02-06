@@ -606,7 +606,8 @@ exports.createPdf = async (req, res) => {
     const htmlContent = generateHTML(data, doctor);
 
     const browser = await puppeteer.launch({
-      args: ['--no-sandbox']
+        ignoreDefaultArgs: ['--disable-extensions'],
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: "domcontentloaded" });
@@ -622,6 +623,7 @@ exports.createPdf = async (req, res) => {
     await browser.close();
 
   } catch (error) {
+    console.error('Error generating PDF labels:', error);
     res.status(500).json({ error: error.message });
   }
 };
